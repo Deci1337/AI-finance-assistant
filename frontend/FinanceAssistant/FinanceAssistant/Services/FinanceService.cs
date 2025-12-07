@@ -2,93 +2,36 @@ using FinanceAssistant.Models;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Maui.Storage;
-using Microsoft.Maui.Media;
 
 namespace FinanceAssistant.Services
 {
     public class FinanceService
     {
-        private const string API_BASE_URL = "http://localhost:8000";
-        
-        // Stub data - will be replaced with backend API calls
-        private readonly List<Transaction> _transactions;
-        private readonly UserProfile _userProfile;
+        private string _apiBaseUrl;
 
         public FinanceService()
         {
-            _userProfile = new UserProfile
-            {
-                Name = "Alex",
-                TotalBalance = 125430.50m,
-                MonthlyIncome = 85000m,
-                MonthlyExpense = 42350m
-            };
-
-            _transactions = GenerateStubTransactions();
+            _apiBaseUrl = GetApiBaseUrl();
         }
 
-        private List<Transaction> GenerateStubTransactions()
+        private static string GetApiBaseUrl()
         {
-            return new List<Transaction>
-            {
-                new() { Id = 1, Title = "Salary", Amount = 85000, Type = TransactionType.Income, Category = "Work", Date = DateTime.Now.AddDays(-1) },
-                new() { Id = 2, Title = "Groceries", Amount = 3500, Type = TransactionType.Expense, Category = "Food", Date = DateTime.Now.AddDays(-1) },
-                new() { Id = 3, Title = "Netflix", Amount = 799, Type = TransactionType.Expense, Category = "Entertainment", Date = DateTime.Now.AddDays(-2) },
-                new() { Id = 4, Title = "Freelance", Amount = 15000, Type = TransactionType.Income, Category = "Work", Date = DateTime.Now.AddDays(-3) },
-                new() { Id = 5, Title = "Restaurant", Amount = 2800, Type = TransactionType.Expense, Category = "Food", Date = DateTime.Now.AddDays(-3) },
-                new() { Id = 6, Title = "Transport", Amount = 1500, Type = TransactionType.Expense, Category = "Transport", Date = DateTime.Now.AddDays(-4) },
-                new() { Id = 7, Title = "Gym", Amount = 3000, Type = TransactionType.Expense, Category = "Health", Date = DateTime.Now.AddDays(-5) },
-                new() { Id = 8, Title = "Bonus", Amount = 10000, Type = TransactionType.Income, Category = "Work", Date = DateTime.Now.AddDays(-7) },
-            };
-        }
+            var savedUrl = Preferences.Get("api_base_url", string.Empty);
+            if (!string.IsNullOrEmpty(savedUrl))
+                return savedUrl;
 
-        public Task<UserProfile> GetUserProfileAsync()
-        {
-            return Task.FromResult(_userProfile);
-        }
-
-        public Task<List<Transaction>> GetRecentTransactionsAsync(int count = 10)
-        {
-            return Task.FromResult(_transactions.OrderByDescending(t => t.Date).Take(count).ToList());
-        }
-
-        public Task<List<ChartDataPoint>> GetChartDataAsync(int days = 7)
-        {
-            var data = new List<ChartDataPoint>();
-            var random = new Random(42); // Fixed seed for consistent stub data
-
-            for (int i = days - 1; i >= 0; i--)
-            {
-                var date = DateTime.Now.AddDays(-i).Date;
-                data.Add(new ChartDataPoint
-                {
-                    Date = date,
-                    Income = random.Next(5000, 20000),
-                    Expense = random.Next(2000, 10000)
-                });
-            }
-
-            return Task.FromResult(data);
-        }
-
-        public Task AddTransactionAsync(Transaction transaction)
-        {
-            transaction.Id = _transactions.Count + 1;
-            transaction.Date = DateTime.Now;
-            _transactions.Add(transaction);
+            // Default for Android emulator
+            if (DeviceInfo.Platform == DevicePlatform.Android && DeviceInfo.DeviceType == DeviceType.Virtual)
+                return "http://10.0.2.2:8000";
             
-            if (transaction.Type == TransactionType.Income)
-            {
-                _userProfile.TotalBalance += transaction.Amount;
-                _userProfile.MonthlyIncome += transaction.Amount;
-            }
-            else
-            {
-                _userProfile.TotalBalance -= transaction.Amount;
-                _userProfile.MonthlyExpense += transaction.Amount;
-            }
+            return "http://localhost:8000";
+        }
 
-            return Task.CompletedTask;
+        public string GetCurrentServerUrl() => _apiBaseUrl;
+
+        public void RefreshApiUrl()
+        {
+            _apiBaseUrl = GetApiBaseUrl();
         }
 
         public async Task<TransactionExtractionResult> ExtractTransactionsFromMessageAsync(string message, string? context = null)
@@ -107,7 +50,7 @@ namespace FinanceAssistant.Services
                 var json = JsonSerializer.Serialize(request);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var response = await httpClient.PostAsync($"{API_BASE_URL}/extract-transactions", content);
+                var response = await httpClient.PostAsync($"{_apiBaseUrl}/extract-transactions", content);
                 
                 if (response.IsSuccessStatusCode)
                 {
@@ -136,28 +79,28 @@ namespace FinanceAssistant.Services
             };
         }
 
-        public async Task<VoiceTranscriptionAndExtractionResult> TranscribeAndExtractAsync(FileResult audioFile)
+        public async Task<ChatResult> SendChatMessageAsync(string message, string? context = null)
         {
             try
             {
                 using var httpClient = new HttpClient();
-                httpClient.Timeout = TimeSpan.FromSeconds(60);
+                httpClient.Timeout = TimeSpan.FromSeconds(30);
 
-                using var content = new MultipartFormDataContent();
-                
-                var fileStream = await audioFile.OpenReadAsync();
-                var streamContent = new StreamContent(fileStream);
-                streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("audio/wav");
-                
-                content.Add(streamContent, "audio", audioFile.FileName ?? "audio.wav");
-                content.Add(new StringContent("wav"), "audio_format");
+                var request = new
+                {
+                    message = message,
+                    context = context
+                };
 
-                var response = await httpClient.PostAsync($"{API_BASE_URL}/transcribe-and-extract", content);
+                var json = JsonSerializer.Serialize(request);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await httpClient.PostAsync($"{_apiBaseUrl}/chat", content);
                 
                 if (response.IsSuccessStatusCode)
                 {
                     var responseContent = await response.Content.ReadAsStringAsync();
-                    var result = JsonSerializer.Deserialize<VoiceTranscriptionAndExtractionResult>(responseContent, new JsonSerializerOptions
+                    var result = JsonSerializer.Deserialize<ChatResult>(responseContent, new JsonSerializerOptions
                     {
                         PropertyNameCaseInsensitive = true
                     });
@@ -167,38 +110,66 @@ namespace FinanceAssistant.Services
                         return result;
                     }
                 }
-                else
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error sending chat message: {ex.Message}");
+                return new ChatResult
                 {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    return new VoiceTranscriptionAndExtractionResult
+                    Response = $"Ошибка подключения: {ex.Message}",
+                    Timestamp = DateTime.Now.ToString("o")
+                };
+            }
+
+            return new ChatResult
+            {
+                Response = "Не удалось получить ответ от сервера.",
+                Timestamp = DateTime.Now.ToString("o")
+            };
+        }
+
+        public async Task<FriendlinessResult?> AnalyzeFriendlinessAsync(string message)
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+                httpClient.Timeout = TimeSpan.FromSeconds(10);
+
+                var request = new { message = message };
+                var json = JsonSerializer.Serialize(request);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await httpClient.PostAsync($"{_apiBaseUrl}/analyze-friendliness", content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var result = JsonSerializer.Deserialize<FriendlinessResult>(responseContent, new JsonSerializerOptions
                     {
-                        Success = false,
-                        Error = $"Ошибка сервера: {response.StatusCode}",
-                        Transcription = "",
-                        Transactions = new List<ExtractedTransaction>()
-                    };
+                        PropertyNameCaseInsensitive = true
+                    });
+                    return result;
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error transcribing audio: {ex.Message}");
-                return new VoiceTranscriptionAndExtractionResult
-                {
-                    Success = false,
-                    Error = $"Ошибка: {ex.Message}",
-                    Transcription = "",
-                    Transactions = new List<ExtractedTransaction>()
-                };
+                System.Diagnostics.Debug.WriteLine($"Error analyzing friendliness: {ex.Message}");
             }
-
-            return new VoiceTranscriptionAndExtractionResult
-            {
-                Success = false,
-                Error = "Не удалось обработать аудио",
-                Transcription = "",
-                Transactions = new List<ExtractedTransaction>()
-            };
+            return null;
         }
+    }
+
+    public class ChatResult
+    {
+        public string Response { get; set; } = string.Empty;
+        public string Timestamp { get; set; } = string.Empty;
+    }
+
+    public class FriendlinessResult
+    {
+        public double FriendlinessScore { get; set; }
+        public string Sentiment { get; set; } = string.Empty;
+        public string Timestamp { get; set; } = string.Empty;
     }
 
     public class TransactionExtractionResult
@@ -227,16 +198,4 @@ namespace FinanceAssistant.Services
         public decimal TotalExpense { get; set; }
         public int TransactionsCount { get; set; }
     }
-
-    public class VoiceTranscriptionAndExtractionResult
-    {
-        public bool Success { get; set; }
-        public string Transcription { get; set; } = string.Empty;
-        public List<ExtractedTransaction> Transactions { get; set; } = new();
-        public string? Analysis { get; set; }
-        public List<string>? Questions { get; set; }
-        public List<string>? Warnings { get; set; }
-        public string? Error { get; set; }
-    }
 }
-

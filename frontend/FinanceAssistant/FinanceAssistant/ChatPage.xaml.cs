@@ -2,6 +2,7 @@ using FinanceAssistant.Data;
 using FinanceAssistant.Models;
 using FinanceAssistant.Services;
 using Microsoft.Maui.Controls.Shapes;
+using System.Text.RegularExpressions;
 
 namespace FinanceAssistant
 {
@@ -16,52 +17,26 @@ namespace FinanceAssistant
             _financeService = financeService;
             _databaseService = databaseService;
             
-            UpdateConnectionStatus();
             AddWelcomeMessage();
-            _ = CheckServerConnectionAsync();
         }
 
         protected override void OnAppearing()
         {
             base.OnAppearing();
             ScrollToBottom();
-            UpdateConnectionStatus();
         }
 
-        private void UpdateConnectionStatus()
-        {
-            ConnectionStatusLabel.Text = $"Сервер: {_financeService.GetApiBaseUrl()}";
-        }
-
-        private async Task CheckServerConnectionAsync()
-        {
-            var isAvailable = await _financeService.IsServerAvailableAsync();
-            MainThread.BeginInvokeOnMainThread(() =>
-            {
-                if (isAvailable)
-                {
-                    ConnectionIndicator.Text = "OK";
-                    ConnectionIndicator.TextColor = Color.FromArgb("#00D09E");
-                }
-                else
-                {
-                    ConnectionIndicator.Text = "Offline";
-                    ConnectionIndicator.TextColor = Color.FromArgb("#FF6B6B");
-                }
-            });
-        }
-
-        private async void OnBackTapped(object? sender, TappedEventArgs e)
+        private async void OnBackTapped(object? sender, EventArgs e)
         {
             await Shell.Current.GoToAsync("..");
         }
 
-        private async void OnTitleTapped(object? sender, TappedEventArgs e)
+        private async void OnTitleTapped(object? sender, EventArgs e)
         {
             await ShowServerSettingsAsync();
         }
 
-        private async void OnSettingsTapped(object? sender, TappedEventArgs e)
+        private async void OnSettingsTapped(object? sender, EventArgs e)
         {
             await ShowServerSettingsAsync();
         }
@@ -75,8 +50,7 @@ namespace FinanceAssistant
                 "Ввести IP адрес", 
                 "Использовать localhost (Windows)",
                 "Использовать 10.0.2.2 (Android эмулятор)",
-                "Как узнать IP компьютера?",
-                "Проверить подключение"
+                "Как узнать IP компьютера?"
             );
 
             if (action == "Ввести IP адрес")
@@ -92,33 +66,24 @@ namespace FinanceAssistant
                 if (!string.IsNullOrWhiteSpace(ipAddress))
                 {
                     var ip = ipAddress.Trim();
-                    // Add http:// and port if not present
                     if (!ip.StartsWith("http"))
-                    {
                         ip = $"http://{ip}";
-                    }
                     if (!ip.Contains(":8000"))
-                    {
                         ip = $"{ip}:8000";
-                    }
                     
-                    _financeService.SetApiBaseUrl(ip);
-                    UpdateConnectionStatus();
-                    await DisplayAlert("Готово", $"Адрес сервера установлен: {ip}", "OK");
-                    await CheckServerConnectionAsync();
+                    Preferences.Set("api_base_url", ip);
+                    await DisplayAlert("Готово", $"Адрес сервера: {ip}\n\nПерезапустите чат для применения.", "OK");
                 }
             }
             else if (action == "Использовать localhost (Windows)")
             {
-                _financeService.SetApiBaseUrl("http://localhost:8000");
-                UpdateConnectionStatus();
-                await CheckServerConnectionAsync();
+                Preferences.Set("api_base_url", "http://localhost:8000");
+                await DisplayAlert("Готово", "Установлен localhost:8000", "OK");
             }
             else if (action == "Использовать 10.0.2.2 (Android эмулятор)")
             {
-                _financeService.SetApiBaseUrl("http://10.0.2.2:8000");
-                UpdateConnectionStatus();
-                await CheckServerConnectionAsync();
+                Preferences.Set("api_base_url", "http://10.0.2.2:8000");
+                await DisplayAlert("Готово", "Установлен 10.0.2.2:8000", "OK");
             }
             else if (action == "Как узнать IP компьютера?")
             {
@@ -126,37 +91,13 @@ namespace FinanceAssistant
                     "Windows:\n" +
                     "1. Откройте PowerShell\n" +
                     "2. Введите: ipconfig\n" +
-                    "3. Найдите 'IPv4 Address' в секции Wi-Fi или Ethernet\n\n" +
+                    "3. Найдите 'IPv4 Address'\n\n" +
                     "Пример: 192.168.1.100\n\n" +
                     "Важно:\n" +
-                    "- Телефон и компьютер должны быть в одной Wi-Fi сети\n" +
-                    "- Backend должен быть запущен на компьютере\n" +
-                    "- Firewall должен разрешать порт 8000",
+                    "- Телефон и ПК в одной Wi-Fi сети\n" +
+                    "- Backend запущен (python main.py)",
                     "OK"
                 );
-            }
-            else if (action == "Проверить подключение")
-            {
-                var isAvailable = await _financeService.IsServerAvailableAsync();
-                if (isAvailable)
-                {
-                    await DisplayAlert("Подключение", "Сервер доступен!", "OK");
-                    ConnectionIndicator.Text = "OK";
-                    ConnectionIndicator.TextColor = Color.FromArgb("#00D09E");
-                }
-                else
-                {
-                    await DisplayAlert("Ошибка", 
-                        $"Не удалось подключиться к серверу:\n{_financeService.GetApiBaseUrl()}\n\n" +
-                        "Проверьте:\n" +
-                        "1. Backend запущен (python main.py)\n" +
-                        "2. Правильный IP адрес\n" +
-                        "3. Firewall не блокирует порт 8000",
-                        "OK"
-                    );
-                    ConnectionIndicator.Text = "Offline";
-                    ConnectionIndicator.TextColor = Color.FromArgb("#FF6B6B");
-                }
             }
         }
 
@@ -172,8 +113,7 @@ namespace FinanceAssistant
                 "- Получил зарплату 85000\n\n" +
                 "Примеры вопросов:\n" +
                 "- Как экономить деньги?\n" +
-                "- Что такое инвестиции?\n\n" +
-                "Нажмите * чтобы настроить IP сервера"
+                "- Что такое инвестиции?"
             );
             MessagesContainer.Children.Add(messageView);
         }
@@ -182,7 +122,6 @@ namespace FinanceAssistant
         {
             var messageLower = message.ToLower();
             
-            // Keywords indicating a transaction
             var transactionKeywords = new[]
             {
                 "потратил", "потратила", "потратили",
@@ -197,17 +136,16 @@ namespace FinanceAssistant
             
             bool hasTransactionKeyword = transactionKeywords.Any(k => messageLower.Contains(k));
             
-            // Check for amounts (numbers + currency)
             var amountPatterns = new[]
             {
-                @"\d+\s*(рубл|rub|₽|р\.|руб)",
+                @"\d+\s*(рубл|rub|р\.|руб)",
                 @"\d+\s*(тысяч|тыс|к)",
                 @"\d+\s*(доллар|usd|\$|бакс)",
-                @"\d+\s*(евро|eur|€)"
+                @"\d+\s*(евро|eur)"
             };
             
             bool hasAmount = amountPatterns.Any(p => 
-                System.Text.RegularExpressions.Regex.IsMatch(messageLower, p, System.Text.RegularExpressions.RegexOptions.IgnoreCase));
+                Regex.IsMatch(messageLower, p, RegexOptions.IgnoreCase));
             
             return hasTransactionKeyword || hasAmount;
         }
@@ -233,10 +171,9 @@ namespace FinanceAssistant
 
             try
             {
-                // Determine if message is about transactions or general chat
                 if (IsTransactionMessage(message))
                 {
-                    // Handle as transaction extraction
+                    // Handle as transaction
                     var result = await _financeService.ExtractTransactionsFromMessageAsync(message);
                     MessagesContainer.Children.Remove(loadingView);
 
@@ -276,7 +213,7 @@ namespace FinanceAssistant
                 }
                 else
                 {
-                    // Handle as general chat message
+                    // Handle as general chat
                     var chatResult = await _financeService.SendChatMessageAsync(message);
                     MessagesContainer.Children.Remove(loadingView);
 
@@ -288,12 +225,39 @@ namespace FinanceAssistant
             catch (Exception ex)
             {
                 MessagesContainer.Children.Remove(loadingView);
-                var errorView = CreateBotMessageView($"Ошибка: {ex.Message}\n\nНажмите * для настройки сервера");
+                var errorView = CreateBotMessageView($"Произошла ошибка: {ex.Message}");
                 MessagesContainer.Children.Add(errorView);
                 ScrollToBottom();
             }
 
             MessageEntry.IsEnabled = true;
+        }
+
+        private async Task AnalyzeFriendlinessAsync(string message)
+        {
+            try
+            {
+                var result = await _financeService.AnalyzeFriendlinessAsync(message);
+                if (result != null)
+                {
+                    var profile = await _databaseService.GetUserProfileAsync();
+                    
+                    // Update friendliness using weighted average
+                    int totalMessages = profile.MessagesAnalyzed + 1;
+                    double weight = Math.Min(0.3, 1.0 / totalMessages);
+                    
+                    profile.Friendliness = profile.Friendliness * (1 - weight) + result.FriendlinessScore * weight;
+                    profile.MessagesAnalyzed = totalMessages;
+                    
+                    await _databaseService.SaveUserProfileAsync(profile);
+                    
+                    System.Diagnostics.Debug.WriteLine($"Friendliness updated: {result.FriendlinessScore:F2} -> avg: {profile.Friendliness:F2}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error analyzing friendliness: {ex.Message}");
+            }
         }
 
         private void AddUserMessage(string message)
@@ -369,7 +333,7 @@ namespace FinanceAssistant
             return border;
         }
 
-        private View CreateTransactionPreviewView(ExtractedTransaction extractedTransaction, TransactionExtractionResult result)
+        private View CreateTransactionPreviewView(FinanceAssistant.Services.ExtractedTransaction extractedTransaction, FinanceAssistant.Services.TransactionExtractionResult result)
         {
             var border = new Border
             {
@@ -419,7 +383,7 @@ namespace FinanceAssistant
 
             var categoryLabel = new Label
             {
-                Text = $"{extractedTransaction.Category} - {extractedTransaction.Date}",
+                Text = $"{extractedTransaction.Category} • {extractedTransaction.Date}",
                 TextColor = Color.FromArgb("#8B949E"),
                 FontSize = 12
             };
@@ -458,15 +422,14 @@ namespace FinanceAssistant
             return border;
         }
 
-        private async Task AddTransactionFromExtracted(ExtractedTransaction extractedTransaction)
+        private async Task AddTransactionFromExtracted(FinanceAssistant.Services.ExtractedTransaction extractedTransaction)
         {
             if (!extractedTransaction.Amount.HasValue)
             {
-                await DisplayAlert("Ошибка", "Нельзя добавить транзакцию без суммы", "OK");
+                await DisplayAlert("Ошибка", "Нельзя добавить транзакцию без суммы", "ОК");
                 return;
             }
 
-            // Get or create category in database
             var transactionType = extractedTransaction.Type == "income" ? TransactionType.Income : TransactionType.Expense;
             var categoryName = MapCategory(extractedTransaction.Category);
             var category = await _databaseService.GetOrCreateCategoryAsync(categoryName, transactionType);
@@ -487,7 +450,7 @@ namespace FinanceAssistant
             MessagesContainer.Children.Add(successView);
             ScrollToBottom();
 
-            await DisplayAlert("Успешно", "Транзакция добавлена", "OK");
+            await DisplayAlert("Успешно", "Транзакция добавлена", "ОК");
         }
 
         private string MapCategory(string category)
@@ -535,7 +498,7 @@ namespace FinanceAssistant
             {
                 var warningLabel = new Label
                 {
-                    Text = $"- {warning}",
+                    Text = $"• {warning}",
                     TextColor = Color.FromArgb("#FF6B6B"),
                     FontSize = 12
                 };
@@ -559,36 +522,6 @@ namespace FinanceAssistant
         {
             return $"{amount:N0} RUB".Replace(",", " ");
         }
-
-        /// <summary>
-        /// Analyze friendliness of user message and update profile
-        /// </summary>
-        private async Task AnalyzeFriendlinessAsync(string message)
-        {
-            try
-            {
-                var result = await _financeService.AnalyzeFriendlinessAsync(message);
-                if (result != null)
-                {
-                    var profile = await _databaseService.GetUserProfileAsync();
-                    
-                    // Update friendliness using weighted average
-                    // New messages have more weight for recent behavior
-                    int totalMessages = profile.MessagesAnalyzed + 1;
-                    double weight = Math.Min(0.3, 1.0 / totalMessages); // Max 30% weight for new message
-                    
-                    profile.Friendliness = profile.Friendliness * (1 - weight) + result.FriendlinessScore * weight;
-                    profile.MessagesAnalyzed = totalMessages;
-                    
-                    await _databaseService.SaveUserProfileAsync(profile);
-                    
-                    System.Diagnostics.Debug.WriteLine($"Friendliness updated: {result.FriendlinessScore} -> avg: {profile.Friendliness}");
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error analyzing friendliness: {ex.Message}");
-            }
-        }
     }
 }
+

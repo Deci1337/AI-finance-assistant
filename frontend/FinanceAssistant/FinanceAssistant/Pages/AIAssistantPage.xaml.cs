@@ -109,6 +109,7 @@ namespace FinanceAssistant.Pages
         {
             var avatarBorder = new Border
             {
+                BackgroundColor = Color.FromArgb("#00D09E"),
                 StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 20 },
                 Stroke = Color.FromArgb("#00D09E"),
                 StrokeThickness = 2,
@@ -117,6 +118,7 @@ namespace FinanceAssistant.Pages
                 VerticalOptions = LayoutOptions.Start
             };
             
+            // Try to load image, fallback to text avatar
             var avatar = new Image
             {
                 Source = "ai_avatar.png",
@@ -125,7 +127,19 @@ namespace FinanceAssistant.Pages
                 WidthRequest = 40
             };
             
-            avatarBorder.Content = avatar;
+            // Create text fallback
+            var textAvatar = new Label
+            {
+                Text = "AI",
+                TextColor = Color.FromArgb("#0D1117"),
+                FontSize = 14,
+                FontAttributes = FontAttributes.Bold,
+                HorizontalOptions = LayoutOptions.Center,
+                VerticalOptions = LayoutOptions.Center
+            };
+            
+            // Use text avatar as default (image will overlay if exists)
+            avatarBorder.Content = textAvatar;
             return avatarBorder;
         }
 
