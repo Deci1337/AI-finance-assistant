@@ -645,21 +645,33 @@ class GigaChatAIClient:
    - Если сумма не указана точно, попробуй извлечь из контекста или укажи null
    - Если категория неясна, используй "Other"
 
-4. ДЕТАЛЬНЫЙ ФИНАНСОВЫЙ АНАЛИЗ (ОБЯЗАТЕЛЬНО):
-   В поле "analysis" ты ДОЛЖЕН предоставить развернутый финансовый анализ, включающий:
-   - Общую оценку транзакций: сумма, количество, типы (доходы/расходы), их соотношение
-   - Анализ категорий: какие категории преобладают, почему это важно, какие тенденции наблюдаются
-   - Финансовые тренды: если есть несколько транзакций или контекст, выяви паттерны и тренды
-   - Конкретные рекомендации: как можно оптимизировать расходы, где сэкономить, что улучшить
-   - Предупреждения о рисках: превышение бюджета, необычные или крупные расходы, потенциальные проблемы
-   - Практические советы: что делать дальше, на что обратить внимание, как лучше управлять финансами
-   - Прогноз и планирование: как эти транзакции влияют на будущее финансовое состояние, что учесть
+4. ФИНАНСОВЫЙ АНАЛИЗ (АДАПТИВНЫЙ):
+   В поле "analysis" предоставь финансовый анализ, АДАПТИРУЯ его под сложность сообщения:
    
-   Анализ должен быть:
-   - Развернутым (минимум 8-10 предложений, желательно больше)
-   - Конкретным и практичным (не общие фразы, а конкретные рекомендации)
-   - Полезным (пользователь должен получить ценную информацию)
-   - Структурированным (можно использовать нумерацию или разделы для удобства чтения)
+   ДЛЯ ПРОСТЫХ СООБЩЕНИЙ (1 транзакция, мало контекста, например "купил хлеб за 100 рублей"):
+   - Краткая оценка: тип транзакции, сумма, категория
+   - Одно простое замечание или рекомендация (1-2 предложения)
+   - БЕЗ markdown форматирования (не используй ###, ##, #)
+   - БЕЗ излишних деталей, трендов, прогнозов
+   - Пример: "Зарегистрирован расход на продукты питания в размере 100 рублей. Это обычная покупка."
+   
+   ДЛЯ СРЕДНИХ СООБЩЕНИЙ (2-3 транзакции или больше контекста):
+   - Общая оценка транзакций: сумма, количество, типы
+   - Краткий анализ категорий
+   - 1-2 практические рекомендации
+   - БЕЗ markdown форматирования
+   - 3-5 предложений
+   
+   ДЛЯ СЛОЖНЫХ СООБЩЕНИЙ (много транзакций, детальный контекст, временные периоды):
+   - Полный анализ: оценка, категории, тренды, рекомендации, советы, прогноз
+   - БЕЗ markdown форматирования (используй обычный текст с переносами строк)
+   - 8-10+ предложений
+   
+   ВАЖНО:
+   - НЕ используй markdown заголовки (###, ##, #) - только обычный текст
+   - Адаптируй длину анализа под сложность сообщения
+   - Для простых сообщений - короткий анализ (1-3 предложения)
+   - Для сложных - развернутый анализ (8-10+ предложений)
 
 5. ФОРМАТ ОТВЕТА:
    Верни ответ в формате JSON:
@@ -684,7 +696,7 @@ class GigaChatAIClient:
                "latest": "самая поздняя дата"
            }}
        }},
-       "analysis": "развернутый финансовый анализ согласно инструкциям выше (минимум 8-10 предложений)",
+       "analysis": "адаптивный финансовый анализ согласно инструкциям выше (длина зависит от сложности сообщения)",
        "questions": ["вопросы для уточнения, если информации недостаточно"],
        "warnings": ["предупреждения о неоднозначностях или проблемах"]
    }}
@@ -753,16 +765,17 @@ class GigaChatAIClient:
                             # Если есть transactions, используем их
                             if 'transactions' in result:
                                 result['extracted_parameters'] = extracted_params
-                                # Проверяем, что анализ достаточно развернутый
+                                # Очищаем анализ от markdown форматирования
                                 analysis = result.get('analysis', '')
-                                if not analysis or len(analysis) < 500:
-                                    # Если анализ слишком короткий, извлекаем его из текста ответа или генерируем
-                                    if len(text_response) > len(analysis):
-                                        # Используем весь текст ответа как анализ, если он длиннее
-                                        result['analysis'] = self._extract_analysis_from_text(text_response, result.get('transactions', []))
-                                    else:
-                                        # Генерируем анализ на основе транзакций
-                                        result['analysis'] = self._generate_analysis_from_transactions(result.get('transactions', []), result.get('extracted_info', {}))
+                                if analysis:
+                                    # Убираем markdown заголовки (###, ##, #)
+                                    analysis = re.sub(r'^#{1,3}\s+', '', analysis, flags=re.MULTILINE)
+                                    # Убираем лишние переносы строк
+                                    analysis = re.sub(r'\n{3,}', '\n\n', analysis)
+                                    result['analysis'] = analysis.strip()
+                                elif not analysis:
+                                    # Если анализа нет, генерируем на основе транзакций
+                                    result['analysis'] = self._generate_analysis_from_transactions(result.get('transactions', []), result.get('extracted_info', {}), user_message)
                                 print(f"✅ Successfully extracted {len(result.get('transactions', []))} transactions using model {self.model}")
                                 return result
                             # Если нет transactions, но есть другие данные, пробуем создать структуру
@@ -792,7 +805,7 @@ class GigaChatAIClient:
                                             "latest": transactions_from_text[-1].get('date') if transactions_from_text else None
                                         }
                                     },
-                                    "analysis": self._extract_analysis_from_text(text_response, transactions_from_text),
+                                    "analysis": self._extract_analysis_from_text(text_response, transactions_from_text, user_message),
                                     "questions": [],
                                     "warnings": [],
                                     "extracted_parameters": extracted_params
@@ -1061,7 +1074,7 @@ class GigaChatAIClient:
         
         return transactions
     
-    def _extract_analysis_from_text(self, text: str, transactions: List[Dict]) -> str:
+    def _extract_analysis_from_text(self, text: str, transactions: List[Dict], message: str = "") -> str:
         """Извлечение анализа из текстового ответа API"""
         # Ищем анализ в тексте - обычно это длинный блок текста после JSON или в отдельном разделе
         analysis_patterns = [
@@ -1093,15 +1106,27 @@ class GigaChatAIClient:
                 return analysis
         
         # Если ничего не нашли, генерируем анализ на основе транзакций
-        return self._generate_analysis_from_transactions(transactions, {})
+        return self._generate_analysis_from_transactions(transactions, {}, message)
     
-    def _generate_analysis_from_transactions(self, transactions: List[Dict], extracted_info: Dict) -> str:
-        """Генерация развернутого анализа на основе транзакций"""
+    def _generate_analysis_from_transactions(self, transactions: List[Dict], extracted_info: Dict, message: str = "") -> str:
+        """Генерация адаптивного анализа на основе транзакций"""
         if not transactions:
             return "Транзакции не найдены в сообщении."
         
+        # Определяем сложность сообщения
+        is_simple = len(transactions) == 1 and len(message.split()) < 10
+        is_medium = len(transactions) <= 3 and len(message.split()) < 30
+        
         total_income = extracted_info.get('total_income', sum(t.get('amount', 0) for t in transactions if t.get('type') == 'income' and t.get('amount')))
         total_expense = extracted_info.get('total_expense', sum(t.get('amount', 0) for t in transactions if t.get('type') == 'expense' and t.get('amount')))
+        
+        # Для простых сообщений - краткий анализ
+        if is_simple:
+            trans = transactions[0]
+            trans_type = "расход" if trans.get('type') == 'expense' else "доход"
+            amount = trans.get('amount', 0)
+            category = trans.get('category', 'Other')
+            return f"Зарегистрирован {trans_type} на сумму {amount:,.0f} рублей (категория: {category}). Это обычная транзакция."
         
         income_count = len([t for t in transactions if t.get('type') == 'income'])
         expense_count = len([t for t in transactions if t.get('type') == 'expense'])
@@ -1110,60 +1135,43 @@ class GigaChatAIClient:
         categories = {}
         for t in transactions:
             cat = t.get('category', 'Other')
-            categories[cat] = categories.get(cat, 0) + t.get('amount', 0)
+            categories[cat] = categories.get(cat, 0) + (t.get('amount', 0) or 0)
         
         dominant_category = max(categories.items(), key=lambda x: x[1])[0] if categories else None
         
         analysis_parts = []
         
         # Общая оценка
-        analysis_parts.append(f"### Общая оценка транзакций")
-        analysis_parts.append(f"Всего зарегистрировано {len(transactions)} транзакций: {income_count} доходов и {expense_count} расходов.")
+        analysis_parts.append(f"Зарегистрировано {len(transactions)} транзакций: {income_count} доходов и {expense_count} расходов.")
         if total_income > 0:
-            analysis_parts.append(f"Общая сумма доходов составляет {total_income:,.0f} рублей.")
+            analysis_parts.append(f"Общая сумма доходов: {total_income:,.0f} рублей.")
         if total_expense > 0:
-            analysis_parts.append(f"Общая сумма расходов составляет {total_expense:,.0f} рублей.")
+            analysis_parts.append(f"Общая сумма расходов: {total_expense:,.0f} рублей.")
         
         balance = total_income - total_expense
         if balance > 0:
-            analysis_parts.append(f"Баланс положительный: {balance:,.0f} рублей. Это хороший знак финансовой стабильности.")
+            analysis_parts.append(f"Баланс положительный: {balance:,.0f} рублей.")
         elif balance < 0:
-            analysis_parts.append(f"Баланс отрицательный: {abs(balance):,.0f} рублей. Стоит обратить внимание на превышение расходов над доходами.")
-        else:
-            analysis_parts.append("Доходы и расходы сбалансированы.")
+            analysis_parts.append(f"Баланс отрицательный: {abs(balance):,.0f} рублей.")
         
-        # Анализ категорий
-        if categories:
-            analysis_parts.append(f"\n### Анализ категорий")
-            analysis_parts.append(f"Расходы распределены по следующим категориям: {', '.join(categories.keys())}.")
+        # Для средних сообщений - добавляем анализ категорий
+        if is_medium and categories:
             if dominant_category:
-                analysis_parts.append(f"Наибольшая доля расходов приходится на категорию '{dominant_category}' ({categories[dominant_category]:,.0f} рублей).")
+                analysis_parts.append(f"Основная категория расходов: {dominant_category}.")
         
-        # Рекомендации
-        analysis_parts.append(f"\n### Рекомендации")
-        if total_expense > total_income * 0.8:
-            analysis_parts.append("Расходы составляют более 80% от доходов. Рекомендуется пересмотреть бюджет и найти возможности для экономии.")
-        if expense_count > income_count * 2:
-            analysis_parts.append("Количество расходов значительно превышает количество доходов. Стоит проанализировать, какие расходы можно оптимизировать.")
-        if balance > 0:
-            analysis_parts.append("Рекомендуется отложить часть положительного баланса на непредвиденные расходы или инвестиции.")
+        # Для сложных сообщений - полный анализ
+        if not is_medium:
+            if categories:
+                analysis_parts.append(f"\nРасходы по категориям: {', '.join(categories.keys())}.")
+                if dominant_category:
+                    analysis_parts.append(f"Наибольшая доля расходов приходится на категорию '{dominant_category}' ({categories[dominant_category]:,.0f} рублей).")
+            
+            if total_expense > total_income * 0.8 if total_income > 0 else False:
+                analysis_parts.append("\nРекомендуется пересмотреть бюджет и найти возможности для экономии.")
+            if balance > 0:
+                analysis_parts.append("Рекомендуется отложить часть положительного баланса на непредвиденные расходы.")
         
-        # Практические советы
-        analysis_parts.append(f"\n### Практические советы")
-        analysis_parts.append("Для улучшения управления финансами рекомендуется:")
-        analysis_parts.append("1. Регулярно отслеживать все транзакции")
-        analysis_parts.append("2. Планировать бюджет на месяц вперед")
-        analysis_parts.append("3. Анализировать категории расходов и находить возможности для оптимизации")
-        analysis_parts.append("4. Создать резервный фонд на случай непредвиденных ситуаций")
-        
-        # Прогноз
-        analysis_parts.append(f"\n### Прогноз и планирование")
-        if balance > 0:
-            analysis_parts.append("При сохранении текущей динамики доходов и расходов финансовое положение будет стабильным.")
-        else:
-            analysis_parts.append("Необходимо пересмотреть структуру расходов, чтобы избежать финансовых трудностей в будущем.")
-        
-        return '\n\n'.join(analysis_parts)
+        return ' '.join(analysis_parts)
     
     def _normalize_emotions(self, emotions: Dict[str, float]) -> Dict[str, float]:
         """Нормализация эмоций (сумма должна быть ~1.0)"""
@@ -1532,7 +1540,7 @@ def extract_transactions_with_fallback(user_message: str, context: Optional[str]
             if transactions and len(transactions) > 0:
                 # Убеждаемся, что анализ есть и достаточно развернутый
                 if not result.get('analysis') or len(result.get('analysis', '')) < 300:
-                    result['analysis'] = client._generate_analysis_from_transactions(transactions, result.get('extracted_info', {}))
+                    result['analysis'] = client._generate_analysis_from_transactions(transactions, result.get('extracted_info', {}), user_message)
                 return result
             # Если транзакций нет, но есть анализ или другие данные, пробуем извлечь транзакции из текста
             elif result.get('analysis') or result.get('extracted_info'):
@@ -1701,17 +1709,29 @@ def _simple_transaction_extraction(message: str) -> Dict:
                 "latest": transactions[-1]["date"] if transactions else None
             }
         },
-        "analysis": _generate_fallback_analysis(transactions, total_income, total_expense),
+        "analysis": _generate_fallback_analysis(transactions, total_income, total_expense, message),
         "questions": ["Пожалуйста, уточните сумму транзакции", "Укажите точную дату транзакции"] if not amounts_with_context else [],
         "warnings": ["Данные извлечены с помощью простого анализа. Для более точного результата используйте GigaChat API."],
         "extracted_parameters": {}
     }
 
 
-def _generate_fallback_analysis(transactions: List[Dict], total_income: float, total_expense: float) -> str:
-    """Генерация развернутого анализа для fallback метода"""
+def _generate_fallback_analysis(transactions: List[Dict], total_income: float, total_expense: float, message: str = "") -> str:
+    """Генерация адаптивного анализа для fallback метода"""
+    # Определяем сложность
+    is_simple = len(transactions) == 1 and len(message.split()) < 10
+    is_medium = len(transactions) <= 3 and len(message.split()) < 30
+    
     income_count = len([t for t in transactions if t.get('type') == 'income'])
     expense_count = len([t for t in transactions if t.get('type') == 'expense'])
+    
+    # Для простых сообщений - краткий анализ
+    if is_simple:
+        trans = transactions[0]
+        trans_type = "расход" if trans.get('type') == 'expense' else "доход"
+        amount = trans.get('amount', 0)
+        category = trans.get('category', 'Other')
+        return f"Зарегистрирован {trans_type} на сумму {amount:,.0f} рублей (категория: {category}). Это обычная транзакция."
     
     # Анализ категорий
     categories = {}
@@ -1724,54 +1744,36 @@ def _generate_fallback_analysis(transactions: List[Dict], total_income: float, t
     analysis_parts = []
     
     # Общая оценка
-    analysis_parts.append("### Общая оценка транзакций")
-    analysis_parts.append(f"Всего зарегистрировано {len(transactions)} транзакций: {income_count} доходов и {expense_count} расходов.")
+    analysis_parts.append(f"Зарегистрировано {len(transactions)} транзакций: {income_count} доходов и {expense_count} расходов.")
     if total_income > 0:
-        analysis_parts.append(f"Общая сумма доходов составляет {total_income:,.0f} рублей.")
+        analysis_parts.append(f"Общая сумма доходов: {total_income:,.0f} рублей.")
     if total_expense > 0:
-        analysis_parts.append(f"Общая сумма расходов составляет {total_expense:,.0f} рублей.")
+        analysis_parts.append(f"Общая сумма расходов: {total_expense:,.0f} рублей.")
     
     balance = total_income - total_expense
     if balance > 0:
-        analysis_parts.append(f"Баланс положительный: {balance:,.0f} рублей. Это хороший знак финансовой стабильности.")
+        analysis_parts.append(f"Баланс положительный: {balance:,.0f} рублей.")
     elif balance < 0:
-        analysis_parts.append(f"Баланс отрицательный: {abs(balance):,.0f} рублей. Стоит обратить внимание на превышение расходов над доходами.")
-    else:
-        analysis_parts.append("Доходы и расходы сбалансированы.")
+        analysis_parts.append(f"Баланс отрицательный: {abs(balance):,.0f} рублей.")
     
-    # Анализ категорий
-    if categories:
-        analysis_parts.append("\n### Анализ категорий")
-        analysis_parts.append(f"Расходы распределены по следующим категориям: {', '.join(categories.keys())}.")
+    # Для средних сообщений - добавляем анализ категорий
+    if is_medium and categories:
         if dominant_category:
-            analysis_parts.append(f"Наибольшая доля расходов приходится на категорию '{dominant_category}' ({categories[dominant_category]:,.0f} рублей).")
+            analysis_parts.append(f"Основная категория расходов: {dominant_category}.")
     
-    # Рекомендации
-    analysis_parts.append("\n### Рекомендации")
-    if total_expense > total_income * 0.8 if total_income > 0 else True:
-        analysis_parts.append("Расходы составляют значительную долю от доходов. Рекомендуется пересмотреть бюджет и найти возможности для экономии.")
-    if expense_count > income_count * 2:
-        analysis_parts.append("Количество расходов значительно превышает количество доходов. Стоит проанализировать, какие расходы можно оптимизировать.")
-    if balance > 0:
-        analysis_parts.append("Рекомендуется отложить часть положительного баланса на непредвиденные расходы или инвестиции.")
-    analysis_parts.append("Рекомендуется вести учет всех транзакций для лучшего контроля финансов.")
+    # Для сложных сообщений - полный анализ
+    if not is_medium:
+        if categories:
+            analysis_parts.append(f"\nРасходы по категориям: {', '.join(categories.keys())}.")
+            if dominant_category:
+                analysis_parts.append(f"Наибольшая доля расходов приходится на категорию '{dominant_category}' ({categories[dominant_category]:,.0f} рублей).")
+        
+        if total_expense > total_income * 0.8 if total_income > 0 else False:
+            analysis_parts.append("\nРекомендуется пересмотреть бюджет и найти возможности для экономии.")
+        if balance > 0:
+            analysis_parts.append("Рекомендуется отложить часть положительного баланса на непредвиденные расходы.")
     
-    # Практические советы
-    analysis_parts.append("\n### Практические советы")
-    analysis_parts.append("Для улучшения управления финансами рекомендуется:")
-    analysis_parts.append("1. Регулярно отслеживать все транзакции")
-    analysis_parts.append("2. Планировать бюджет на месяц вперед")
-    analysis_parts.append("3. Анализировать категории расходов и находить возможности для оптимизации")
-    analysis_parts.append("4. Создать резервный фонд на случай непредвиденных ситуаций")
-    
-    # Прогноз
-    analysis_parts.append("\n### Прогноз и планирование")
-    if balance > 0:
-        analysis_parts.append("При сохранении текущей динамики доходов и расходов финансовое положение будет стабильным.")
-    else:
-        analysis_parts.append("Необходимо пересмотреть структуру расходов, чтобы избежать финансовых трудностей в будущем.")
-    
-    return '\n\n'.join(analysis_parts)
+    return ' '.join(analysis_parts)
 
 
 def _extract_title_from_message(message: str, transaction_type: str) -> str:
