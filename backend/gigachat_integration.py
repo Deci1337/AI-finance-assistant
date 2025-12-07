@@ -1961,18 +1961,29 @@ def analyze_friendliness_with_fallback(text: str) -> Dict:
                     result = response.json()
                     if 'choices' in result and len(result['choices']) > 0:
                         content = result['choices'][0].get('message', {}).get('content', '')
-                        # Извлекаем JSON из ответа
-                        json_match = re.search(r'\{[^}]+\}', content)
+                        print(f"Friendliness raw response: {content}")
+                        
+                        # Извлекаем JSON из ответа (улучшенный regex)
+                        json_match = re.search(r'\{[\s\S]*?\}', content)
                         if json_match:
-                            friendliness_data = json.loads(json_match.group())
-                            friendliness_score = friendliness_data.get('friendliness_score', 0.5)
-                            sentiment = friendliness_data.get('sentiment', 'neutral')
-                            
-                            return {
-                                "friendliness_score": max(0.0, min(1.0, float(friendliness_score))),
-                                "sentiment": sentiment,
-                                "timestamp": datetime.now().isoformat()
-                            }
+                            try:
+                                friendliness_data = json.loads(json_match.group())
+                                friendliness_score = friendliness_data.get('friendliness_score', 0.5)
+                                sentiment = friendliness_data.get('sentiment', 'neutral')
+                                
+                                print(f"Parsed friendliness: score={friendliness_score}, sentiment={sentiment}")
+                                
+                                return {
+                                    "friendliness_score": max(0.0, min(1.0, float(friendliness_score))),
+                                    "sentiment": sentiment,
+                                    "timestamp": datetime.now().isoformat()
+                                }
+                            except json.JSONDecodeError as je:
+                                print(f"JSON parse error: {je}, content: {json_match.group()}")
+                        else:
+                            print(f"No JSON found in response: {content}")
+                else:
+                    print(f"Friendliness API error: {response.status_code} - {response.text}")
         except Exception as e:
             print(f"GigaChat friendliness analysis error: {str(e)}")
     

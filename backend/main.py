@@ -573,9 +573,14 @@ async def analyze_friendliness(request: FriendlinessRequest) -> FriendlinessResp
     try:
         result = analyze_friendliness_with_fallback(request.message)
         
+        score = result.get("friendliness_score", 0.5)
+        sentiment = result.get("sentiment", "neutral")
+        
+        print(f"Friendliness endpoint returning: score={score}, sentiment={sentiment}")
+        
         return FriendlinessResponse(
-            friendliness_score=result.get("friendliness_score", 0.5),
-            sentiment=result.get("sentiment", "neutral"),
+            friendliness_score=score,
+            sentiment=sentiment,
             timestamp=result.get("timestamp", datetime.now().isoformat())
         )
     except Exception as e:

@@ -49,13 +49,11 @@ namespace FinanceAssistant.Pages
 
         private void UpdateFriendlinessDisplay(double friendliness, int messagesAnalyzed)
         {
-            // friendliness is from -1 (evil) to 1 (kind)
-            // Convert to 0-1 range for positioning
-            double normalizedValue = (friendliness + 1) / 2.0;
+            // friendliness is from 0 (evil) to 1 (kind)
+            // Clamp to valid range
+            double normalizedValue = Math.Clamp(friendliness, 0, 1);
             
             // Update the indicator position
-            // The progress bar width is approximately the parent width minus padding
-            // We'll use a percentage-based margin
             MainThread.BeginInvokeOnMainThread(() =>
             {
                 // Get the parent width (approximate)
@@ -78,26 +76,28 @@ namespace FinanceAssistant.Pages
 
         private static string GetFriendlinessText(double friendliness)
         {
+            // friendliness: 0.0 = very rude, 0.5 = neutral, 1.0 = very kind
             return friendliness switch
             {
-                < -0.7 => "Очень грубый",
-                < -0.4 => "Грубый",
-                < -0.1 => "Немного грубый",
-                < 0.1 => "Нейтрально",
-                < 0.4 => "Дружелюбный",
-                < 0.7 => "Очень дружелюбный",
+                < 0.2 => "Очень грубый",
+                < 0.35 => "Грубый",
+                < 0.45 => "Немного грубый",
+                < 0.55 => "Нейтрально",
+                < 0.65 => "Дружелюбный",
+                < 0.8 => "Очень дружелюбный",
                 _ => "Супер добрый!"
             };
         }
 
         private static Color GetFriendlinessColor(double friendliness)
         {
+            // friendliness: 0.0 = very rude, 0.5 = neutral, 1.0 = very kind
             return friendliness switch
             {
-                < -0.4 => Color.FromArgb("#FF6B6B"), // Red
-                < -0.1 => Color.FromArgb("#FFA07A"), // Light red
-                < 0.1 => Color.FromArgb("#FFE66D"),  // Yellow
-                < 0.4 => Color.FromArgb("#90EE90"),  // Light green
+                < 0.3 => Color.FromArgb("#FF6B6B"), // Red
+                < 0.45 => Color.FromArgb("#FFA07A"), // Light red
+                < 0.55 => Color.FromArgb("#FFE66D"),  // Yellow
+                < 0.7 => Color.FromArgb("#90EE90"),  // Light green
                 _ => Color.FromArgb("#00D09E")       // Green
             };
         }

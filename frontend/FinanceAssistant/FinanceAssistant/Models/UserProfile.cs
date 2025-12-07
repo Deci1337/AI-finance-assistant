@@ -17,10 +17,10 @@ namespace FinanceAssistant.Models
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         
         /// <summary>
-        /// Friendliness score from -1 (evil) to 1 (kind)
-        /// Calculated by AI based on user messages
+        /// Friendliness score from 0 (evil) to 1 (kind)
+        /// 0.5 = neutral, calculated by AI based on user messages
         /// </summary>
-        public double Friendliness { get; set; } = 0.0;
+        public double Friendliness { get; set; } = 0.5;
         
         /// <summary>
         /// Total number of messages analyzed for friendliness

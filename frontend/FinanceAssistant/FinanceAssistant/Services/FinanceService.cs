@@ -386,8 +386,13 @@ namespace FinanceAssistant.Services
 
     public class FriendlinessResult
     {
+        [System.Text.Json.Serialization.JsonPropertyName("friendliness_score")]
         public double FriendlinessScore { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("sentiment")]
         public string Sentiment { get; set; } = string.Empty;
+        
+        [System.Text.Json.Serialization.JsonPropertyName("timestamp")]
         public string Timestamp { get; set; } = string.Empty;
     }
 
