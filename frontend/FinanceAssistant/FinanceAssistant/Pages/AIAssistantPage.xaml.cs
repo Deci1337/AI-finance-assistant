@@ -185,8 +185,16 @@ namespace FinanceAssistant.Pages
             _ = SendMessageAsync();
         }
 
-        private void OnMicTapped(object? sender, EventArgs e)
+        private async void OnMicTapped(object? sender, EventArgs e)
         {
+            // Request microphone permission
+            var status = await Permissions.RequestAsync<Permissions.Microphone>();
+            if (status != PermissionStatus.Granted)
+            {
+                AddSystemMessage("Нет доступа к микрофону");
+                return;
+            }
+            
             _isRecording = !_isRecording;
             UpdateMicButtonState();
             
