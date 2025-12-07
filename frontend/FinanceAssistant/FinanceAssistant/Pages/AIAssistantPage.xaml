@@ -95,8 +95,10 @@
                         <TapGestureRecognizer Tapped="OnMicTapped"/>
                     </Border.GestureRecognizers>
                     <Label x:Name="MicIcon"
-                           Text="&#127908;"
-                           FontSize="22"
+                           Text="MIC"
+                           TextColor="{StaticResource TextPrimary}"
+                           FontSize="12"
+                           FontAttributes="Bold"
                            HorizontalOptions="Center"
                            VerticalOptions="Center"/>
                 </Border>

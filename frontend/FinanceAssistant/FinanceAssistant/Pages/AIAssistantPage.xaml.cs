@@ -217,12 +217,14 @@ namespace FinanceAssistant.Pages
             if (_isRecording)
             {
                 MicButton.BackgroundColor = Color.FromArgb("#FF4444");
-                MicIcon.Text = "\u23F9"; // Stop symbol
+                MicIcon.Text = "STOP";
+                MicIcon.TextColor = Colors.White;
             }
             else
             {
                 MicButton.BackgroundColor = Color.FromArgb("#21262D");
-                MicIcon.Text = "\uD83C\uDFA4"; // Microphone emoji
+                MicIcon.Text = "MIC";
+                MicIcon.TextColor = Color.FromArgb("#E6EDF3");
             }
         }
 
