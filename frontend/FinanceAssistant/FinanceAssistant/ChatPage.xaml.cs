@@ -357,13 +357,42 @@ namespace FinanceAssistant
 
         private View CreateBotMessageView(string message)
         {
+            var container = new HorizontalStackLayout
+            {
+                Spacing = 10,
+                HorizontalOptions = LayoutOptions.Start,
+                VerticalOptions = LayoutOptions.Start
+            };
+
+            // Avatar
+            var avatarBorder = new Border
+            {
+                BackgroundColor = Colors.Transparent,
+                StrokeShape = new RoundRectangle { CornerRadius = 20 },
+                Stroke = Brush.Transparent,
+                WidthRequest = 40,
+                HeightRequest = 40,
+                VerticalOptions = LayoutOptions.Start
+            };
+
+            var avatarImage = new Image
+            {
+                Source = "ai_avatar.jpg",
+                Aspect = Aspect.AspectFill,
+                WidthRequest = 40,
+                HeightRequest = 40
+            };
+
+            avatarBorder.Content = avatarImage;
+            container.Children.Add(avatarBorder);
+
+            // Message bubble
             var border = new Border
             {
                 BackgroundColor = Color.FromArgb("#161B22"),
                 StrokeShape = new RoundRectangle { CornerRadius = 15 },
                 Stroke = Brush.Transparent,
                 Padding = new Thickness(15),
-                HorizontalOptions = LayoutOptions.Start,
                 MaximumWidthRequest = 300
             };
 
@@ -375,11 +404,43 @@ namespace FinanceAssistant
             };
 
             border.Content = label;
-            return border;
+            container.Children.Add(border);
+
+            return container;
         }
 
         private View CreateLoadingMessageView()
         {
+            var container = new HorizontalStackLayout
+            {
+                Spacing = 10,
+                HorizontalOptions = LayoutOptions.Start,
+                VerticalOptions = LayoutOptions.Start
+            };
+
+            // Avatar
+            var avatarBorder = new Border
+            {
+                BackgroundColor = Colors.Transparent,
+                StrokeShape = new RoundRectangle { CornerRadius = 20 },
+                Stroke = Brush.Transparent,
+                WidthRequest = 40,
+                HeightRequest = 40,
+                VerticalOptions = LayoutOptions.Start
+            };
+
+            var avatarImage = new Image
+            {
+                Source = "ai_avatar.jpg",
+                Aspect = Aspect.AspectFill,
+                WidthRequest = 40,
+                HeightRequest = 40
+            };
+
+            avatarBorder.Content = avatarImage;
+            container.Children.Add(avatarBorder);
+
+            // Loading bubble
             var border = new Border
             {
                 BackgroundColor = Color.FromArgb("#161B22"),
@@ -396,7 +457,9 @@ namespace FinanceAssistant
             };
 
             border.Content = activityIndicator;
-            return border;
+            container.Children.Add(border);
+
+            return container;
         }
 
         private View CreateTransactionPreviewView(FinanceAssistant.Services.ExtractedTransaction extractedTransaction, FinanceAssistant.Services.TransactionExtractionResult result)
