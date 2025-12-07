@@ -20,7 +20,8 @@ from gigachat_integration import (
     transcribe_audio_with_fallback,
     get_access_token,
     chat_completion,
-    GigaChatAIClient
+    GigaChatAIClient,
+    is_transaction_message
 )
 
 # Создание экземпляра FastAPI приложения
@@ -384,6 +385,20 @@ async def extract_transactions(request: TransactionExtractionRequest) -> Transac
     - "Вчера потратил 2000 на обед в ресторане"
     """
     try:
+        # Проверяем, является ли сообщение запросом на транзакцию
+        if not is_transaction_message(request.user_message):
+            # Если это не транзакция, возвращаем пустой результат
+            return TransactionExtractionResponse(
+                extraction_id=f"extraction_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                extraction_date=datetime.now().isoformat(),
+                transactions=[],
+                extracted_info=None,
+                analysis="Это сообщение не содержит информации о транзакциях. Используйте /chat для обычных вопросов.",
+                questions=None,
+                warnings=None,
+                extracted_parameters=None
+            )
+        
         result = extract_transactions_with_fallback(
             request.user_message,
             request.context
@@ -593,11 +608,17 @@ async def global_exception_handler(request, exc):
 
 def main():
     """Запуск приложения"""
+    import sys
+    
+    # Для Termux (Android) отключаем reload для стабильности
+    is_termux = os.path.exists("/data/data/com.termux")
+    reload_enabled = not is_termux
+    
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
+        host="0.0.0.0",  # Принимает подключения со всех интерфейсов
         port=8000,
-        reload=True,  # Автоперезагрузка при изменении кода
+        reload=reload_enabled,  # Автоперезагрузка только на ПК
         log_level="info"
     )
 

@@ -942,6 +942,67 @@ def generate_comprehensive_advice_with_fallback(user_message: str, portfolio_dat
     }
 
 
+def is_transaction_message(user_message: str) -> bool:
+    """
+    Определяет, является ли сообщение запросом на добавление транзакции
+    
+    Args:
+        user_message: Сообщение пользователя
+        
+    Returns:
+        True если сообщение содержит информацию о транзакции, False если это обычный вопрос
+    """
+    message_lower = user_message.lower()
+    
+    # Ключевые слова, указывающие на транзакцию
+    transaction_keywords = [
+        # Расходы
+        "потратил", "потратила", "потратили",
+        "купил", "купила", "купили", "купить",
+        "заплатил", "заплатила", "заплатили", "заплатить",
+        "трата", "траты", "расход", "расходы",
+        "затратил", "затратила", "затратили",
+        # Доходы
+        "получил", "получила", "получили", "получить",
+        "заработал", "заработала", "заработали", "заработать",
+        "доход", "доходы", "прибыль", "зарплата", "зарплату",
+        # Общие
+        "добавить", "добавь", "добавить транзакцию",
+        "записать", "запиши", "записать транзакцию",
+        "внести", "внеси", "внести транзакцию"
+    ]
+    
+    # Проверяем наличие ключевых слов
+    has_transaction_keyword = any(keyword in message_lower for keyword in transaction_keywords)
+    
+    # Проверяем наличие суммы (цифры + валюта)
+    amount_patterns = [
+        r'\d+\s*(рубл[ейя]|rub|₽|р\.|руб)',
+        r'\d+\s*(тысяч|тыс|к|k)',
+        r'\d+\s*(миллион|млн|m)',
+        r'\d+\s*(доллар|usd|\$|бакс)',
+        r'\d+\s*(евро|eur|€)',
+        r'\d+\s*р\.',
+    ]
+    
+    has_amount = any(re.search(pattern, message_lower, re.IGNORECASE) for pattern in amount_patterns)
+    
+    # Если есть ключевое слово транзакции ИЛИ есть сумма - это транзакция
+    if has_transaction_keyword or has_amount:
+        return True
+    
+    # Вопросы обычно не являются транзакциями
+    question_words = ["как", "что", "почему", "зачем", "когда", "где", "кто", "сколько", "какой", "какая"]
+    is_question = any(message_lower.startswith(word) for word in question_words) or "?" in user_message
+    
+    # Если это вопрос без суммы и ключевых слов транзакции - это не транзакция
+    if is_question and not has_amount and not has_transaction_keyword:
+        return False
+    
+    # По умолчанию, если есть сумма - считаем транзакцией
+    return has_amount
+
+
 def extract_transactions_with_fallback(user_message: str, context: Optional[str] = None) -> Dict:
     """
     Извлечение транзакций из сообщения пользователя с fallback

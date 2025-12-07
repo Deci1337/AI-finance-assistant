@@ -8,16 +8,37 @@ namespace FinanceAssistant
         {
             InitializeComponent();
             
-            // Запускаем backend при старте приложения (только на Windows)
-#if WINDOWS
+            // Запускаем backend при старте приложения автоматически
             _ = StartBackendAsync();
-#endif
         }
 
         private async Task StartBackendAsync()
         {
-            var started = await BackendService.Instance.StartBackendAsync();
-            System.Diagnostics.Debug.WriteLine($"Backend auto-start: {started}");
+            try
+            {
+                // Небольшая задержка для инициализации приложения
+                await Task.Delay(1000);
+                
+                var started = await BackendService.Instance.StartBackendAsync();
+                System.Diagnostics.Debug.WriteLine($"Backend auto-start: {started}");
+                
+                if (!started)
+                {
+                    // Для Android - это нормально, используем облачный сервер или локальный на ПК
+                    if (DeviceInfo.Platform == DevicePlatform.Android)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Android: Backend не запущен локально. Используйте облачный сервер или локальный сервер на ПК в той же Wi-Fi сети.");
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("Backend не запустился автоматически. Используйте внешний сервер или запустите вручную.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка автозапуска backend: {ex.Message}");
+            }
         }
 
         protected override Window CreateWindow(IActivationState? activationState)
@@ -27,9 +48,7 @@ namespace FinanceAssistant
             // Останавливаем backend при закрытии приложения
             window.Destroying += (s, e) =>
             {
-#if WINDOWS
                 BackendService.Instance.StopBackend();
-#endif
             };
             
             return window;
