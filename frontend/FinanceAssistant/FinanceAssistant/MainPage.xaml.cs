@@ -1,6 +1,7 @@
 ﻿using FinanceAssistant.Controls;
 using FinanceAssistant.Data;
 using FinanceAssistant.Models;
+using FinanceAssistant.Services;
 using Microsoft.Maui.Controls.Shapes;
 
 namespace FinanceAssistant
@@ -8,12 +9,14 @@ namespace FinanceAssistant
     public partial class MainPage : ContentPage
     {
         private readonly DatabaseService _databaseService;
+        private readonly FinanceService _financeService;
         private readonly FinanceChartDrawable _chartDrawable;
 
-        public MainPage(DatabaseService databaseService)
+        public MainPage(DatabaseService databaseService, FinanceService financeService)
         {
             InitializeComponent();
             _databaseService = databaseService;
+            _financeService = financeService;
             _chartDrawable = new FinanceChartDrawable();
             ChartView.Drawable = _chartDrawable;
         }
@@ -44,6 +47,59 @@ namespace FinanceAssistant
 
             // Update transactions
             UpdateTransactionsList(transactions);
+
+            // Load AI insights
+            await LoadInsightsAsync(transactions);
+        }
+
+        private async Task LoadInsightsAsync(List<Transaction> recentTransactions)
+        {
+            try
+            {
+                // Получаем все транзакции текущего месяца для анализа
+                var allTransactions = await _databaseService.GetTransactionsAsync();
+                var currentMonthTransactions = allTransactions
+                    .Where(t => t.Date.Month == DateTime.Now.Month && t.Date.Year == DateTime.Now.Year)
+                    .ToList();
+
+                if (currentMonthTransactions.Count < 3)
+                {
+                    InsightsWidget.IsVisible = false;
+                    return;
+                }
+
+                // Преобразуем транзакции в формат для API
+                var transactionsData = currentMonthTransactions.Select(t => new Dictionary<string, object>
+                {
+                    { "title", t.Title },
+                    { "amount", (double)t.Amount },
+                    { "category", t.Category?.Name ?? "Other" },
+                    { "date", t.Date.ToString("yyyy-MM-dd") },
+                    { "importance", t.Importance.ToString().ToLower() },
+                    { "type", t.Type == TransactionType.Expense ? "expense" : "income" }
+                }).ToList();
+
+                var currentMonth = DateTime.Now.ToString("yyyy-MM");
+                var insight = await _financeService.GetInsightsAsync(transactionsData, currentMonth);
+
+                if (insight != null && !string.IsNullOrEmpty(insight.Insight))
+                {
+                    InsightsWidget.IsVisible = true;
+                    InsightText.Text = insight.Insight;
+                    
+                    // Добавляем аналитику
+                    await UpdateInsightAnalyticsAsync(insight, currentMonthTransactions);
+                }
+                else
+                {
+                    InsightsWidget.IsVisible = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading insights: {ex.Message}");
+                InsightsWidget.IsVisible = false;
+            }
         }
 
         private void UpdateTransactionsList(List<Transaction> transactions)
@@ -183,6 +239,129 @@ namespace FinanceAssistant
         private static string GetCategoryIcon(string title)
         {
             return title.Length > 0 ? title[0].ToString().ToUpper() : "O";
+        }
+
+        private async Task UpdateInsightAnalyticsAsync(Services.InsightResult insight, List<Transaction> transactions)
+        {
+            var analyticsContainer = this.FindByName<VerticalStackLayout>("AnalyticsContainer");
+            if (analyticsContainer == null) return;
+            
+            analyticsContainer.Children.Clear();
+            
+            if (string.IsNullOrEmpty(insight.Category)) return;
+            
+            // Фильтруем транзакции по категории
+            var categoryTransactions = transactions
+                .Where(t => t.Category?.Name == insight.Category && t.Type == TransactionType.Expense)
+                .ToList();
+            
+            // Статистика по категории
+            var totalAmount = categoryTransactions.Sum(t => t.Amount);
+            var transactionCount = categoryTransactions.Count;
+            var lowImportanceCount = categoryTransactions.Count(t => t.Importance == ImportanceLevel.Low);
+            
+            // Сравнение с предыдущим месяцем
+            var previousMonth = DateTime.Now.AddMonths(-1);
+            var previousMonthTransactions = await _databaseService.GetTransactionsAsync();
+            var previousMonthCategoryTransactions = previousMonthTransactions
+                .Where(t => t.Date.Month == previousMonth.Month && 
+                           t.Date.Year == previousMonth.Year &&
+                           t.Category?.Name == insight.Category &&
+                           t.Type == TransactionType.Expense)
+                .ToList();
+            var previousMonthAmount = previousMonthCategoryTransactions.Sum(t => t.Amount);
+            
+            // Процент от общих расходов
+            var currentMonthExpenses = transactions
+                .Where(t => t.Type == TransactionType.Expense)
+                .Sum(t => t.Amount);
+            var percentOfTotal = currentMonthExpenses > 0 
+                ? (totalAmount / currentMonthExpenses * 100) 
+                : 0;
+            
+            // Основная статистика
+            var statsGrid = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitionCollection
+                {
+                    new ColumnDefinition(GridLength.Star),
+                    new ColumnDefinition(GridLength.Star)
+                },
+                RowDefinitions = new RowDefinitionCollection
+                {
+                    new RowDefinition(GridLength.Auto),
+                    new RowDefinition(GridLength.Auto)
+                }
+            };
+            
+            // Сумма
+            var amountLabel = new Label
+            {
+                Text = $"Всего: {FormatCurrency(totalAmount)}",
+                TextColor = Color.FromArgb("#FFFFFF"),
+                FontSize = 16,
+                FontAttributes = FontAttributes.Bold
+            };
+            Grid.SetRow(amountLabel, 0);
+            Grid.SetColumn(amountLabel, 0);
+            
+            // Количество покупок
+            var countLabel = new Label
+            {
+                Text = $"Покупок: {transactionCount}",
+                TextColor = Color.FromArgb("#8B949E"),
+                FontSize = 14
+            };
+            Grid.SetRow(countLabel, 1);
+            Grid.SetColumn(countLabel, 0);
+            
+            // Процент от общих расходов
+            var percentLabel = new Label
+            {
+                Text = $"{percentOfTotal:F1}% от расходов",
+                TextColor = Color.FromArgb("#FF6B6B"),
+                FontSize = 16,
+                FontAttributes = FontAttributes.Bold,
+                HorizontalOptions = LayoutOptions.End
+            };
+            Grid.SetRow(percentLabel, 0);
+            Grid.SetColumn(percentLabel, 1);
+            
+            // Необязательные покупки
+            var lowImportanceLabel = new Label
+            {
+                Text = $"Необязательных: {lowImportanceCount} ({insight.LowImportancePercent ?? 0:F1}%)",
+                TextColor = Color.FromArgb("#8B949E"),
+                FontSize = 14,
+                HorizontalOptions = LayoutOptions.End
+            };
+            Grid.SetRow(lowImportanceLabel, 1);
+            Grid.SetColumn(lowImportanceLabel, 1);
+            
+            statsGrid.Children.Add(amountLabel);
+            statsGrid.Children.Add(countLabel);
+            statsGrid.Children.Add(percentLabel);
+            statsGrid.Children.Add(lowImportanceLabel);
+            
+            analyticsContainer.Children.Add(statsGrid);
+            
+            // Сравнение с предыдущим месяцем
+            if (previousMonthAmount > 0)
+            {
+                var comparison = totalAmount - previousMonthAmount;
+                var comparisonPercent = (comparison / previousMonthAmount * 100);
+                var comparisonColor = comparison > 0 ? Color.FromArgb("#FF6B6B") : Color.FromArgb("#00D09E");
+                var comparisonText = comparison > 0 ? "больше" : "меньше";
+                
+                var comparisonLabel = new Label
+                {
+                    Text = $"По сравнению с прошлым месяцем: {FormatCurrency(Math.Abs(comparison))} {comparisonText} ({Math.Abs(comparisonPercent):F1}%)",
+                    TextColor = comparisonColor,
+                    FontSize = 13,
+                    Margin = new Thickness(0, 10, 0, 0)
+                };
+                analyticsContainer.Children.Add(comparisonLabel);
+            }
         }
 
         private static string FormatCurrency(decimal amount)

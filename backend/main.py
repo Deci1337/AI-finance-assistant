@@ -19,6 +19,8 @@ from gigachat_integration import (
     extract_transactions_with_fallback,
     transcribe_audio_with_fallback,
     analyze_friendliness_with_fallback,
+    generate_insights_with_fallback,
+    generate_forecast_with_fallback,
     get_access_token,
     chat_completion,
     GigaChatAIClient
@@ -181,6 +183,45 @@ class FriendlinessResponse(BaseModel):
     friendliness_score: float  # Оценка доброты от 0.0 до 1.0
     sentiment: str  # "positive", "neutral" или "negative"
     timestamp: str
+
+
+class InsightRequest(BaseModel):
+    """Модель запроса для получения инсайтов"""
+    transactions: List[Dict]  # Список транзакций
+    current_month: Optional[str] = None  # Текущий месяц для анализа
+
+
+class InsightResponse(BaseModel):
+    """Модель ответа с инсайтом"""
+    insight: Optional[str] = None  # Текст инсайта
+    category: Optional[str] = None  # Категория, к которой относится инсайт
+    amount: Optional[float] = None  # Сумма по категории
+    transaction_count: Optional[int] = None  # Количество транзакций по категории
+    low_importance_count: Optional[int] = None  # Количество транзакций с низкой важностью
+    low_importance_percent: Optional[float] = None  # Процент транзакций с низкой важностью
+    previous_month_amount: Optional[float] = None  # Сумма по категории в предыдущем месяце
+    percent_of_total: Optional[float] = None  # Процент от общих расходов текущего месяца
+    timestamp: Optional[str] = None  # Временная метка
+
+
+class ForecastRequest(BaseModel):
+    """Модель запроса для прогнозирования"""
+    transactions: List[Dict]  # Список транзакций пользователя
+    user_message: str  # Сообщение пользователя с запросом на прогноз
+    months: Optional[int] = 3  # Количество месяцев для прогноза
+
+
+class ForecastResponse(BaseModel):
+    """Модель ответа с прогнозом"""
+    category: Optional[str] = None  # Категория для прогноза
+    current_monthly: Optional[float] = None  # Текущие средние месячные расходы
+    change_percent: Optional[float] = None  # Процент изменения
+    new_monthly: Optional[float] = None  # Новые средние месячные расходы
+    months: Optional[int] = None  # Количество месяцев прогноза
+    monthly_forecast: Optional[List[Dict]] = None  # Прогноз по месяцам
+    total_savings: Optional[float] = None  # Общая экономия за период
+    description: Optional[str] = None  # Описание прогноза
+    timestamp: Optional[str] = None  # Временная метка
 
 
 # Хранение токена GigaChat (кэширование)
@@ -539,6 +580,46 @@ async def analyze_friendliness(request: FriendlinessRequest) -> FriendlinessResp
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при анализе доброты: {str(e)}")
+
+
+@app.post("/insights", response_model=InsightResponse)
+async def get_insights(request: InsightRequest) -> InsightResponse:
+    """
+    Получение персональных инсайтов на основе транзакций пользователя
+    
+    Анализирует паттерны в транзакциях и генерирует персональные рекомендации.
+    Например: "Заметил, что вы несколько раз оценивали сыр как необязательную покупку.
+    В этом месяце на сыр ушло 1200₽. Возможно, стоит попробовать альтернативный продукт или покупать реже?"
+    """
+    try:
+        result = generate_insights_with_fallback(request.transactions, request.current_month)
+        
+        if result:
+            return InsightResponse(
+                insight=result.get("insight"),
+                category=result.get("category"),
+                amount=result.get("amount"),
+                transaction_count=result.get("transaction_count"),
+                low_importance_count=result.get("low_importance_count"),
+                low_importance_percent=result.get("low_importance_percent"),
+                previous_month_amount=result.get("previous_month_amount"),
+                percent_of_total=result.get("percent_of_total"),
+                timestamp=result.get("timestamp", datetime.now().isoformat())
+            )
+        else:
+            return InsightResponse(
+                insight=None,
+                category=None,
+                amount=None,
+                transaction_count=None,
+                low_importance_count=None,
+                low_importance_percent=None,
+                previous_month_amount=None,
+                percent_of_total=None,
+                timestamp=datetime.now().isoformat()
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при генерации инсайтов: {str(e)}")
 
 
 @app.post("/chat", response_model=ChatResponse)

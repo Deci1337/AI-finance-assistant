@@ -203,6 +203,43 @@ namespace FinanceAssistant.Services
                 Error = "Не удалось распознать речь. Проверьте подключение к серверу."
             };
         }
+
+        public async Task<InsightResult?> GetInsightsAsync(List<Dictionary<string, object>> transactions, string? currentMonth = null)
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+                httpClient.Timeout = TimeSpan.FromSeconds(30);
+
+                var request = new
+                {
+                    transactions = transactions,
+                    current_month = currentMonth
+                };
+
+                var json = JsonSerializer.Serialize(request);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await httpClient.PostAsync($"{_apiBaseUrl}/insights", content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var result = JsonSerializer.Deserialize<InsightResult>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    
+                    return result;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting insights: {ex.Message}");
+            }
+
+            return null;
+        }
     }
 
     public class VoiceTranscriptionResult
@@ -250,5 +287,69 @@ namespace FinanceAssistant.Services
         public decimal TotalIncome { get; set; }
         public decimal TotalExpense { get; set; }
         public int TransactionsCount { get; set; }
+    }
+
+    public class InsightResult
+    {
+        public string? Insight { get; set; }
+        public string? Category { get; set; }
+        public double? Amount { get; set; }
+        public int? TransactionCount { get; set; }
+        public int? LowImportanceCount { get; set; }
+        public double? LowImportancePercent { get; set; }
+        public double? PreviousMonthAmount { get; set; }
+        public double? PercentOfTotal { get; set; }
+        public string? Timestamp { get; set; }
+    }
+
+    public async Task<ForecastResult?> GetForecastAsync(List<Dictionary<string, object>> transactions, string userMessage, int months = 3)
+    {
+        try
+        {
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(30);
+
+            var request = new
+            {
+                transactions = transactions,
+                user_message = userMessage,
+                months = months
+            };
+
+            var json = JsonSerializer.Serialize(request);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await httpClient.PostAsync($"{_apiBaseUrl}/forecast", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<ForecastResult>(responseContent, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                
+                return result;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error getting forecast: {ex.Message}");
+        }
+
+        return null;
+    }
+
+    public class ForecastResult
+    {
+        public string? Category { get; set; }
+        public double? CurrentMonthly { get; set; }
+        public double? ChangePercent { get; set; }
+        public double? NewMonthly { get; set; }
+        public int? Months { get; set; }
+        public List<Dictionary<string, object>>? MonthlyForecast { get; set; }
+        public double? TotalSavings { get; set; }
+        public string? Description { get; set; }
+        public string? Timestamp { get; set; }
     }
 }
