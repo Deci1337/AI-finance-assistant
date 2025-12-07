@@ -169,53 +169,55 @@ namespace FinanceAssistant
 
         private async void OnProfileTapped(object? sender, EventArgs e)
         {
-            await DisplayAlert("Profile", "Profile settings will be available soon", "OK");
+            await DisplayAlert("Профиль", "Настройки профиля будут доступны в ближайшее время", "ОК");
         }
 
         private async void OnChatTapped(object? sender, EventArgs e)
         {
-            await DisplayAlert("AI Assistant", "AI Finance Assistant chat will be available soon", "OK");
+            var chatPage = new ChatPage();
+            await Navigation.PushAsync(chatPage);
         }
 
         private async void OnAddTransactionTapped(object? sender, EventArgs e)
         {
-            string action = await DisplayActionSheet("Add Transaction", "Cancel", null, "Income", "Expense");
+            string action = await DisplayActionSheet("Добавить транзакцию", "Отмена", null, "Доход", "Расход");
             
-            if (action == "Cancel" || string.IsNullOrEmpty(action))
+            if (action == "Отмена" || string.IsNullOrEmpty(action))
                 return;
 
-            string? title = await DisplayPromptAsync("Transaction", "Enter title:", "OK", "Cancel");
+            string? title = await DisplayPromptAsync("Транзакция", "Введите название:", "ОК", "Отмена");
             if (string.IsNullOrEmpty(title))
                 return;
 
-            string? amountStr = await DisplayPromptAsync("Amount", "Enter amount:", "OK", "Cancel", keyboard: Keyboard.Numeric);
+            string? amountStr = await DisplayPromptAsync("Сумма", "Введите сумму:", "ОК", "Отмена", keyboard: Keyboard.Numeric);
             if (string.IsNullOrEmpty(amountStr) || !decimal.TryParse(amountStr, out decimal amount))
                 return;
 
-            string? category = await DisplayPromptAsync("Category", "Enter category:", "OK", "Cancel", initialValue: "Other");
+            string? category = await DisplayPromptAsync("Категория", "Введите категорию:", "ОК", "Отмена", initialValue: "Другое");
             
             var transaction = new Transaction
             {
                 Title = title,
                 Amount = amount,
-                Type = action == "Income" ? TransactionType.Income : TransactionType.Expense,
-                Category = category ?? "Other"
+                Type = action == "Доход" ? TransactionType.Income : TransactionType.Expense,
+                Category = category ?? "Другое"
             };
 
             await _financeService.AddTransactionAsync(transaction);
             await LoadDataAsync();
 
-            await DisplayAlert("Success", $"{action} added successfully!", "OK");
+            string actionText = action == "Доход" ? "Доход" : "Расход";
+            await DisplayAlert("Успешно", $"{actionText} добавлен успешно!", "ОК");
         }
 
         private async void OnStatsTapped(object? sender, EventArgs e)
         {
-            await DisplayAlert("Statistics", "Detailed statistics will be available soon", "OK");
+            await DisplayAlert("Статистика", "Детальная статистика будет доступна в ближайшее время", "ОК");
         }
 
         private async void OnSeeAllTapped(object? sender, EventArgs e)
         {
-            await DisplayAlert("All Transactions", "Full transaction history will be available soon", "OK");
+            await DisplayAlert("Все транзакции", "Полная история транзакций будет доступна в ближайшее время", "ОК");
         }
     }
 }

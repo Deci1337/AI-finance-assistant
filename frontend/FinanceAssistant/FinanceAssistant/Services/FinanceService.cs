@@ -1,9 +1,13 @@
 using FinanceAssistant.Models;
+using System.Text;
+using System.Text.Json;
 
 namespace FinanceAssistant.Services
 {
     public class FinanceService
     {
+        private const string API_BASE_URL = "http://localhost:8000";
+        
         // Stub data - will be replaced with backend API calls
         private readonly List<Transaction> _transactions;
         private readonly UserProfile _userProfile;
@@ -84,6 +88,78 @@ namespace FinanceAssistant.Services
 
             return Task.CompletedTask;
         }
+
+        public async Task<TransactionExtractionResult> ExtractTransactionsFromMessageAsync(string message, string? context = null)
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+                httpClient.Timeout = TimeSpan.FromSeconds(30);
+
+                var request = new
+                {
+                    user_message = message,
+                    context = context
+                };
+
+                var json = JsonSerializer.Serialize(request);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await httpClient.PostAsync($"{API_BASE_URL}/extract-transactions", content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var result = JsonSerializer.Deserialize<TransactionExtractionResult>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    
+                    if (result != null)
+                    {
+                        return result;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error extracting transactions: {ex.Message}");
+            }
+
+            return new TransactionExtractionResult
+            {
+                Transactions = new List<ExtractedTransaction>(),
+                Analysis = "Не удалось подключиться к серверу. Проверьте, что backend запущен.",
+                Questions = new List<string> { "Проверьте подключение к серверу" }
+            };
+        }
+    }
+
+    public class TransactionExtractionResult
+    {
+        public List<ExtractedTransaction> Transactions { get; set; } = new();
+        public string? Analysis { get; set; }
+        public List<string>? Questions { get; set; }
+        public List<string>? Warnings { get; set; }
+        public ExtractedInfo? ExtractedInfo { get; set; }
+    }
+
+    public class ExtractedTransaction
+    {
+        public string Type { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public decimal? Amount { get; set; }
+        public string Category { get; set; } = string.Empty;
+        public string Date { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public double Confidence { get; set; }
+    }
+
+    public class ExtractedInfo
+    {
+        public decimal TotalIncome { get; set; }
+        public decimal TotalExpense { get; set; }
+        public int TransactionsCount { get; set; }
     }
 }
 

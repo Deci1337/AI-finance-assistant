@@ -8,6 +8,7 @@ import urllib3
 import json
 import re
 from typing import Dict, List, Optional
+from datetime import datetime
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -41,7 +42,7 @@ def get_models(access_token):
     return response.text
 
 
-def chat_completion(access_token, message, model=MODEL):
+def chat_completion(access_token, message, model=MODEL, temperature=0.7, max_tokens=2000):
     """Выполнение запроса к GigaChat API"""
     url = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
     headers = {
@@ -57,8 +58,8 @@ def chat_completion(access_token, message, model=MODEL):
                 'content': message
             }
         ],
-        'temperature': 0.7,
-        'max_tokens': 1000
+        'temperature': temperature,
+        'max_tokens': max_tokens
     }
     response = requests.request("POST", url, headers=headers, json=payload, verify=False)
     if response.status_code == 200:
@@ -81,44 +82,62 @@ class GigaChatAIClient:
         except Exception:
             return False
     
-    def analyze_emotions(self, text: str, context: Optional[str] = None) -> Optional[Dict[str, float]]:
+    def analyze_emotions(self, text: str, context: Optional[str] = None) -> Optional[Dict]:
         """
-        Анализ эмоций в тексте через GigaChat
+        Анализ эмоций в тексте через GigaChat с детальным анализом и вопросами
         
         Args:
             text: Текст для анализа
             context: Дополнительный контекст
             
         Returns:
-            Словарь с вероятностями эмоций или None
+            Словарь с эмоциями, анализом и вопросами или None
         """
         if not self._is_available():
             return None
-            
+        
+        extracted_params = self._extract_parameters_from_message(text)
+        params_summary = self._format_extracted_parameters(extracted_params)
         context_part = f"\nКонтекст: {context}" if context else ""
         
-        prompt = f"""Проанализируй эмоциональную окраску следующего текста и определи вероятность каждой эмоции (от 0.0 до 1.0).
+        prompt = f"""Ты опытный психолог и финансовый консультант. Проанализируй эмоциональное состояние пользователя на основе его текста, учитывая извлеченные параметры.
 
-Текст: {text}{context_part}
+Текст пользователя: {text}
 
-ВАЖНО: Верни ответ ТОЛЬКО в формате JSON без дополнительного текста:
+ИЗВЛЕЧЕННЫЕ ПАРАМЕТРЫ:
+{params_summary}
+{context_part}
+
+Проведи глубокий анализ эмоций, учитывая:
+- Финансовые цели и приоритеты пользователя
+- Упоминаемые суммы и временные рамки
+- Уровень опыта и знаний
+- Текущую финансовую ситуацию
+- Ограничения и предпочтения
+
+Верни ответ в формате JSON:
 {{
-    "joy": число от 0.0 до 1.0,
-    "fear": число от 0.0 до 1.0,
-    "anger": число от 0.0 до 1.0,
-    "sadness": число от 0.0 до 1.0,
-    "surprise": число от 0.0 до 1.0,
-    "neutral": число от 0.0 до 1.0
+    "emotions": {{
+        "joy": число от 0.0 до 1.0,
+        "fear": число от 0.0 до 1.0,
+        "anger": число от 0.0 до 1.0,
+        "sadness": число от 0.0 до 1.0,
+        "surprise": число от 0.0 до 1.0,
+        "neutral": число от 0.0 до 1.0
+    }},
+    "analysis": "детальное описание эмоционального состояния (3-4 предложения), что может вызывать эти эмоции, как они связаны с финансовой ситуацией, учитывая извлеченные параметры",
+    "questions": ["наводящий вопрос 1 с учетом контекста", "наводящий вопрос 2 с учетом контекста", "наводящий вопрос 3 с учетом контекста"],
+    "recommendations": "конкретные рекомендации по управлению эмоциями в контексте финансов (3-4 предложения), учитывающие финансовые цели и ситуацию пользователя"
 }}
 
-Сумма всех значений должна быть примерно равна 1.0."""
+Сумма всех значений в emotions должна быть примерно равна 1.0. Вопросы должны быть открытыми и помогать пользователю лучше понять свою ситуацию с учетом его целей и ограничений."""
         
         try:
             token = get_access_token()
             if not token:
                 return None
                 
-            response = chat_completion(token, prompt, model=self.model)
+            response = chat_completion(token, prompt, model=self.model, temperature=0.8, max_tokens=2000)
             
             if 'error' in response:
                 return None
@@ -127,47 +146,359 @@ class GigaChatAIClient:
                 text_response = response['choices'][0].get('message', {}).get('content', '')
                 json_match = self._extract_json(text_response)
                 if json_match:
-                    emotions = json.loads(json_match)
-                    return self._normalize_emotions(emotions)
+                    result = json.loads(json_match)
+                    if 'emotions' in result:
+                        result['emotions'] = self._normalize_emotions(result['emotions'])
+                    return result
         except Exception as e:
             print(f"GigaChat emotions analysis error: {str(e)}")
         
         return None
     
-    def generate_financial_advice(self, portfolio_data: Dict, analysis_type: str = "full") -> Optional[List[str]]:
+    def generate_comprehensive_advice(self, user_message: str, portfolio_data: Optional[Dict] = None, 
+                                      context: Optional[str] = None) -> Optional[Dict]:
         """
-        Генерация финансовых советов через GigaChat
+        Генерация комплексных финансовых советов с учетом множества параметров из сообщения пользователя
+        
+        Args:
+            user_message: Сообщение пользователя с запросом
+            portfolio_data: Опциональные данные портфеля
+            context: Дополнительный контекст
+            
+        Returns:
+            Словарь с комплексным анализом и рекомендациями или None
+        """
+        if not self._is_available():
+            return None
+        
+        extracted_params = self._extract_parameters_from_message(user_message)
+        portfolio_summary = self._format_portfolio_summary(portfolio_data) if portfolio_data else "Данные портфеля не предоставлены"
+        context_part = f"\nДополнительный контекст: {context}" if context else ""
+        
+        params_summary = self._format_extracted_parameters(extracted_params)
+        
+        prompt = f"""Ты опытный финансовый консультант и психолог с глубоким пониманием инвестиций, управления финансами и эмоциональных аспектов финансовых решений. 
+
+Твоя задача - провести комплексный анализ запроса пользователя и предоставить персонализированные рекомендации, учитывая ВСЕ извлеченные параметры.
+
+СООБЩЕНИЕ ПОЛЬЗОВАТЕЛЯ:
+{user_message}
+
+ИЗВЛЕЧЕННЫЕ ПАРАМЕТРЫ ИЗ СООБЩЕНИЯ:
+{params_summary}
+
+ДАННЫЕ ПОРТФЕЛЯ (если доступны):
+{portfolio_summary}
+{context_part}
+
+ИНСТРУКЦИИ ДЛЯ АНАЛИЗА:
+
+1. ФИНАНСОВЫЕ ЦЕЛИ:
+   - Определи приоритетные цели пользователя (накопление, инвестиции, покупка, погашение долга и т.д.)
+   - Учти временные рамки (краткосрочные, среднесрочные, долгосрочные)
+   - Предложи конкретные шаги для достижения каждой цели
+
+2. ТОЛЕРАНТНОСТЬ К РИСКУ:
+   - Учти указанный уровень риска (консервативный, умеренный, агрессивный)
+   - Если не указан, определи его на основе сообщения и эмоционального состояния
+   - Адаптируй рекомендации под уровень риска
+
+3. ЭМОЦИОНАЛЬНОЕ СОСТОЯНИЕ:
+   - Проанализируй эмоциональную окраску сообщения
+   - Учти влияние эмоций на финансовые решения
+   - Предложи способы управления эмоциями в контексте финансов
+
+4. ФИНАНСОВАЯ СИТУАЦИЯ:
+   - Оцени текущую финансовую ситуацию пользователя
+   - Учти ограничения (бюджетные, временные, правовые)
+   - Предложи решения с учетом реальных возможностей
+
+5. ОПЫТ И ЗНАНИЯ:
+   - Адаптируй язык и сложность рекомендаций под уровень опыта
+   - Для новичков: объясняй простым языком, давай базовые советы
+   - Для опытных: можешь использовать профессиональную терминологию
+
+6. КАТЕГОРИИ И ПРИОРИТЕТЫ:
+   - Учти упомянутые категории трат/инвестиций
+   - Расставь приоритеты в рекомендациях
+   - Предложи оптимизацию по категориям
+
+7. СУММЫ И РЕСУРСЫ:
+   - Учти упомянутые суммы денег
+   - Предложи конкретные суммы для инвестиций/трат
+   - Рассчитай реалистичные планы с учетом доступных ресурсов
+
+Верни ответ в формате JSON:
+{{
+    "comprehensive_analysis": "развернутый анализ ситуации пользователя (4-5 предложений), учитывающий все извлеченные параметры",
+    "financial_goals_analysis": {{
+        "identified_goals": ["цель 1", "цель 2"],
+        "prioritized_goals": ["приоритетная цель 1", "приоритетная цель 2"],
+        "timeframes": {{
+            "short_term": "краткосрочные цели и действия",
+            "medium_term": "среднесрочные цели и действия",
+            "long_term": "долгосрочные цели и действия"
+        }}
+    }},
+    "risk_assessment": {{
+        "detected_risk_tolerance": "консервативный/умеренный/агрессивный",
+        "risk_analysis": "анализ толерантности к риску (2-3 предложения)",
+        "recommended_risk_level": "рекомендуемый уровень риска с обоснованием"
+    }},
+    "emotional_analysis": {{
+        "detected_emotions": ["эмоция 1", "эмоция 2"],
+        "emotional_impact": "влияние эмоций на финансовые решения (2-3 предложения)",
+        "emotional_management": "рекомендации по управлению эмоциями в финансовом контексте"
+    }},
+    "personalized_recommendations": [
+        {{
+            "category": "категория рекомендации",
+            "priority": "высокий/средний/низкий",
+            "recommendation": "конкретная рекомендация",
+            "action_steps": ["шаг 1", "шаг 2", "шаг 3"],
+            "expected_outcome": "ожидаемый результат"
+        }}
+    ],
+    "financial_plan": {{
+        "current_situation": "оценка текущей ситуации (2-3 предложения)",
+        "recommended_actions": [
+            {{
+                "action": "конкретное действие",
+                "timeline": "временные рамки",
+                "amount": "рекомендуемая сумма (если применимо)",
+                "rationale": "обоснование"
+            }}
+        ],
+        "next_steps": "конкретные следующие шаги (3-4 предложения)"
+    }},
+    "questions_to_clarify": [
+        "уточняющий вопрос 1",
+        "уточняющий вопрос 2",
+        "уточняющий вопрос 3"
+    ],
+    "warnings_and_considerations": [
+        "важное предупреждение или соображение 1",
+        "важное предупреждение или соображение 2"
+    ]
+}}
+
+ВАЖНО:
+- Учитывай ВСЕ извлеченные параметры, даже если они неявно выражены
+- Будь конкретным и практичным в рекомендациях
+- Адаптируй ответ под уровень опыта пользователя
+- Учитывай эмоциональное состояние и предлагай способы его улучшения
+- Предлагай реалистичные и достижимые цели
+- Если информации недостаточно, задавай уточняющие вопросы
+- Всегда учитывай ограничения пользователя"""
+        
+        try:
+            token = get_access_token()
+            if not token:
+                return None
+                
+            response = chat_completion(token, prompt, model=self.model, temperature=0.7, max_tokens=4000)
+            
+            if 'error' in response:
+                return None
+                
+            if 'choices' in response and len(response['choices']) > 0:
+                text_response = response['choices'][0].get('message', {}).get('content', '')
+                json_match = self._extract_json(text_response)
+                if json_match:
+                    result = json.loads(json_match)
+                    if isinstance(result, dict):
+                        result['extracted_parameters'] = extracted_params
+                        return result
+        except Exception as e:
+            print(f"GigaChat comprehensive advice error: {str(e)}")
+        
+        return None
+    
+    def _format_extracted_parameters(self, params: Dict) -> str:
+        """Форматирование извлеченных параметров для промпта"""
+        lines = []
+        
+        if params.get("amounts"):
+            lines.append(f"Суммы: {', '.join(params['amounts'])}")
+        
+        if params.get("timeframes"):
+            lines.append(f"Временные рамки: {', '.join(params['timeframes'])}")
+        
+        if params.get("goals"):
+            lines.append(f"Финансовые цели: {', '.join(params['goals'])}")
+        
+        if params.get("risk_tolerance"):
+            lines.append(f"Толерантность к риску: {params['risk_tolerance']}")
+        
+        if params.get("categories"):
+            lines.append(f"Категории: {', '.join(params['categories'])}")
+        
+        if params.get("priorities"):
+            lines.append(f"Приоритеты: {', '.join(params['priorities'])}")
+        
+        if params.get("constraints"):
+            lines.append(f"Ограничения: {', '.join(params['constraints'])}")
+        
+        if params.get("experience_level"):
+            lines.append(f"Уровень опыта: {params['experience_level']}")
+        
+        if params.get("emotional_state"):
+            lines.append(f"Эмоциональное состояние: {params['emotional_state']}")
+        
+        if params.get("financial_situation"):
+            lines.append(f"Финансовая ситуация: {params['financial_situation']}")
+        
+        if not lines:
+            return "Параметры не были явно указаны в сообщении. Проанализируй сообщение и определи их самостоятельно."
+        
+        return "\n".join(lines)
+    
+    def extract_transactions(self, user_message: str, context: Optional[str] = None) -> Optional[Dict]:
+        """
+        Извлечение транзакций (расходов и доходов) из сообщения пользователя через GigaChat
+        
+        Args:
+            user_message: Сообщение пользователя с информацией о транзакциях
+            context: Дополнительный контекст (например, история транзакций)
+            
+        Returns:
+            Словарь с извлеченными транзакциями и анализом или None
+        """
+        if not self._is_available():
+            return None
+        
+        extracted_params = self._extract_parameters_from_message(user_message)
+        params_summary = self._format_extracted_parameters(extracted_params)
+        context_part = f"\nДополнительный контекст: {context}" if context else ""
+        
+        prompt = f"""Ты опытный финансовый аналитик. Твоя задача - извлечь из сообщения пользователя всю информацию о транзакциях (расходах и доходах) и структурировать её.
+
+СООБЩЕНИЕ ПОЛЬЗОВАТЕЛЯ:
+{user_message}
+
+ИЗВЛЕЧЕННЫЕ ПАРАМЕТРЫ:
+{params_summary}
+{context_part}
+
+ИНСТРУКЦИИ:
+
+1. ИЗВЛЕЧЕНИЕ ТРАНЗАКЦИЙ:
+   - Найди ВСЕ упоминания расходов и доходов в сообщении
+   - Определи тип каждой транзакции (доход или расход)
+   - Извлеки сумму (в рублях, долларах, евро и т.д., конвертируй в рубли если нужно)
+   - Определи категорию транзакции (еда, транспорт, работа, развлечения, здоровье, покупки и т.д.)
+   - Извлеки название/описание транзакции
+   - Определи дату транзакции (если указана, иначе используй сегодняшнюю дату)
+   - Если дата указана словами ("вчера", "неделю назад", "15 января"), определи точную дату
+
+2. КАТЕГОРИИ:
+   Используй следующие категории:
+   - Доходы: Work, Freelance, Investment, Gift, Other
+   - Расходы: Food, Transport, Entertainment, Health, Shopping, Housing, Education, Bills, Other
+
+3. ОБРАБОТКА НЕОДНОЗНАЧНОСТЕЙ:
+   - Если тип транзакции неясен, определи его по контексту (например, "купил" = расход, "получил" = доход)
+   - Если сумма не указана точно, попробуй извлечь из контекста или укажи null
+   - Если категория неясна, используй "Other"
+
+4. ФОРМАТ ОТВЕТА:
+   Верни ответ в формате JSON:
+   {{
+       "transactions": [
+           {{
+               "type": "income" или "expense",
+               "title": "название транзакции",
+               "amount": число (сумма в рублях),
+               "category": "категория",
+               "date": "YYYY-MM-DD" (дата в формате ISO),
+               "description": "описание или дополнительные детали (если есть)",
+               "confidence": число от 0.0 до 1.0 (уверенность в извлечении данных)
+           }}
+       ],
+       "extracted_info": {{
+           "total_income": сумма всех доходов,
+           "total_expense": сумма всех расходов,
+           "transactions_count": количество транзакций,
+           "date_range": {{
+               "earliest": "самая ранняя дата",
+               "latest": "самая поздняя дата"
+           }}
+       }},
+       "analysis": "краткий анализ извлеченных транзакций (2-3 предложения)",
+       "questions": ["вопросы для уточнения, если информации недостаточно"],
+       "warnings": ["предупреждения о неоднозначностях или проблемах"]
+   }}
+
+ВАЖНО:
+- Извлекай ВСЕ транзакции из сообщения, даже если их несколько
+- Если пользователь говорит "купил хлеб за 50 рублей и молоко за 80", это 2 транзакции
+- Если пользователь говорит "трачу на еду 5000 в месяц", это одна транзакция с суммой 5000
+- Будь точным в извлечении сумм и дат
+- Если информации недостаточно, задавай уточняющие вопросы"""
+        
+        try:
+            token = get_access_token()
+            if not token:
+                return None
+                
+            response = chat_completion(token, prompt, model=self.model, temperature=0.3, max_tokens=3000)
+            
+            if 'error' in response:
+                return None
+                
+            if 'choices' in response and len(response['choices']) > 0:
+                text_response = response['choices'][0].get('message', {}).get('content', '')
+                json_match = self._extract_json(text_response)
+                if json_match:
+                    result = json.loads(json_match)
+                    if isinstance(result, dict) and 'transactions' in result:
+                        result['extracted_parameters'] = extracted_params
+                        return result
+        except Exception as e:
+            print(f"GigaChat transaction extraction error: {str(e)}")
+        
+        return None
+    
+    def generate_financial_advice(self, portfolio_data: Dict, analysis_type: str = "full") -> Optional[Dict]:
+        """
+        Генерация финансовых советов через GigaChat с детальным анализом
         
         Args:
             portfolio_data: Данные портфеля
             analysis_type: Тип анализа (full, risk, performance)
             
         Returns:
-            Список рекомендаций или None
+            Словарь с рекомендациями, анализом и вопросами или None
         """
         if not self._is_available():
             return None
             
         portfolio_summary = self._format_portfolio_summary(portfolio_data)
         
-        prompt = f"""Ты финансовый консультант. Проанализируй следующий портфель и дай конкретные рекомендации.
+        prompt = f"""Ты опытный финансовый консультант с глубоким пониманием инвестиций и управления портфелем. Проанализируй следующий портфель и дай развернутые рекомендации.
 
 Данные портфеля:
 {portfolio_summary}
 
 Тип анализа: {analysis_type}
 
-Дай 3-5 конкретных рекомендаций по улучшению портфеля. Каждая рекомендация должна быть краткой (1-2 предложения) и практичной.
+Проведи детальный анализ и верни ответ в формате JSON:
+{{
+    "recommendations": ["конкретная рекомендация 1", "конкретная рекомендация 2", "конкретная рекомендация 3", "конкретная рекомендация 4"],
+    "detailed_analysis": "развернутый анализ портфеля (3-4 предложения): сильные стороны, слабые стороны, риски, возможности",
+    "risk_assessment": "оценка рисков портфеля (2-3 предложения): какие риски присутствуют, как их можно снизить",
+    "questions": ["наводящий вопрос о финансовых целях", "вопрос о толерантности к риску", "вопрос о временном горизонте инвестиций"],
+    "next_steps": "конкретные следующие шаги для улучшения портфеля (2-3 предложения)"
+}}
 
-ВАЖНО: Верни ответ ТОЛЬКО в формате JSON массива строк без дополнительного текста:
-["рекомендация 1", "рекомендация 2", "рекомендация 3"]"""
+Рекомендации должны быть практичными и конкретными. Вопросы должны помочь лучше понять финансовые цели и предпочтения пользователя."""
         
         try:
             token = get_access_token()
             if not token:
                 return None
                 
-            response = chat_completion(token, prompt, model=self.model)
+            response = chat_completion(token, prompt, model=self.model, temperature=0.8, max_tokens=2500)
             
             if 'error' in response:
                 return None
@@ -176,9 +507,9 @@ class GigaChatAIClient:
                 text_response = response['choices'][0].get('message', {}).get('content', '')
                 json_match = self._extract_json(text_response)
                 if json_match:
-                    recommendations = json.loads(json_match)
-                    if isinstance(recommendations, list):
-                        return recommendations
+                    result = json.loads(json_match)
+                    if isinstance(result, dict):
+                        return result
         except Exception as e:
             print(f"GigaChat advice generation error: {str(e)}")
         
@@ -197,6 +528,150 @@ class GigaChatAIClient:
         if total > 0:
             return {k: v / total for k, v in emotions.items()}
         return emotions
+    
+    def _extract_parameters_from_message(self, message: str) -> Dict:
+        """
+        Извлечение параметров из сообщения пользователя
+        
+        Args:
+            message: Текст сообщения пользователя
+            
+        Returns:
+            Словарь с извлеченными параметрами
+        """
+        text_lower = message.lower()
+        parameters = {
+            "amounts": [],
+            "timeframes": [],
+            "goals": [],
+            "risk_tolerance": None,
+            "categories": [],
+            "priorities": [],
+            "constraints": [],
+            "experience_level": None,
+            "emotional_state": None,
+            "financial_situation": None,
+            "preferences": []
+        }
+        
+        amount_patterns = [
+            r'(\d+[\s,.]?\d*)\s*(рубл[ейя]|rub|₽|р\.|руб)',
+            r'(\d+[\s,.]?\d*)\s*(тысяч|тыс|к|k)',
+            r'(\d+[\s,.]?\d*)\s*(миллион|млн|m)',
+            r'(\d+[\s,.]?\d*)\s*(доллар|usd|\$|бакс)',
+            r'(\d+[\s,.]?\d*)\s*(евро|eur|€)'
+        ]
+        
+        for pattern in amount_patterns:
+            matches = re.findall(pattern, text_lower, re.IGNORECASE)
+            parameters["amounts"].extend([match[0] for match in matches])
+        
+        timeframe_keywords = {
+            "краткосрочн": ["месяц", "неделя", "день", "скоро", "быстро", "сейчас"],
+            "среднесрочн": ["полгода", "год", "несколько месяцев", "6 месяцев", "12 месяцев"],
+            "долгосрочн": ["годы", "несколько лет", "5 лет", "10 лет", "долгосрочн", "на будущее"]
+        }
+        
+        for timeframe_type, keywords in timeframe_keywords.items():
+            if any(keyword in text_lower for keyword in keywords):
+                parameters["timeframes"].append(timeframe_type)
+        
+        goal_keywords = {
+            "накопление": ["накопить", "сберечь", "отложить", "накопления", "сбережения"],
+            "инвестиции": ["инвестировать", "вложить", "портфель", "акции", "облигации"],
+            "покупка": ["купить", "приобрести", "покупка", "приобретение"],
+            "погашение_долга": ["долг", "кредит", "займ", "погасить", "вернуть"],
+            "пенсия": ["пенсия", "пенсионный", "на пенсию"],
+            "образование": ["образование", "учеба", "обучение", "университет"],
+            "недвижимость": ["квартира", "дом", "недвижимость", "жилье"]
+        }
+        
+        for goal, keywords in goal_keywords.items():
+            if any(keyword in text_lower for keyword in keywords):
+                parameters["goals"].append(goal)
+        
+        risk_keywords = {
+            "консервативный": ["консервативн", "безопасн", "надежн", "низкий риск", "не рисковать"],
+            "умеренный": ["умеренн", "сбалансированн", "средний риск"],
+            "агрессивный": ["агрессивн", "высокий риск", "рисковать", "максимальная прибыль"]
+        }
+        
+        for risk_level, keywords in risk_keywords.items():
+            if any(keyword in text_lower for keyword in keywords):
+                parameters["risk_tolerance"] = risk_level
+                break
+        
+        category_keywords = {
+            "еда": ["еда", "продукты", "ресторан", "кафе", "питание"],
+            "транспорт": ["транспорт", "машина", "бензин", "такси", "метро"],
+            "развлечения": ["развлечения", "кино", "игры", "отдых", "отпуск"],
+            "здоровье": ["здоровье", "лечение", "врач", "лекарства", "медицина"],
+            "образование": ["образование", "курсы", "обучение", "книги"],
+            "жилье": ["жилье", "аренда", "коммунальные", "ремонт"],
+            "акции": ["акции", "дивиденды", "фондовый рынок"],
+            "облигации": ["облигации", "бонды", "купон"],
+            "наличные": ["наличные", "депозит", "вклад", "сбережения"]
+        }
+        
+        for category, keywords in category_keywords.items():
+            if any(keyword in text_lower for keyword in keywords):
+                parameters["categories"].append(category)
+        
+        priority_keywords = {
+            "высокий": ["важно", "приоритет", "срочно", "необходимо", "нужно"],
+            "средний": ["желательно", "хотелось бы", "можно"],
+            "низкий": ["не важно", "не приоритет", "можно отложить"]
+        }
+        
+        for priority, keywords in priority_keywords.items():
+            if any(keyword in text_lower for keyword in keywords):
+                parameters["priorities"].append(priority)
+        
+        constraint_keywords = {
+            "ограниченный_бюджет": ["мало денег", "ограничен", "не хватает", "бюджет"],
+            "временные_ограничения": ["нет времени", "срочно", "быстро"],
+            "правовые_ограничения": ["закон", "налог", "регулирование"]
+        }
+        
+        for constraint, keywords in constraint_keywords.items():
+            if any(keyword in text_lower for keyword in keywords):
+                parameters["constraints"].append(constraint)
+        
+        experience_keywords = {
+            "новичок": ["новичок", "начинающ", "не знаю", "не понимаю", "первый раз"],
+            "опытный": ["опыт", "знаю", "понимаю", "уже", "давно"],
+            "эксперт": ["эксперт", "профессионал", "много лет", "глубокие знания"]
+        }
+        
+        for level, keywords in experience_keywords.items():
+            if any(keyword in text_lower for keyword in keywords):
+                parameters["experience_level"] = level
+                break
+        
+        emotional_keywords = {
+            "тревога": ["боюсь", "страх", "тревога", "опасение", "беспокоюсь"],
+            "радость": ["рад", "счастлив", "отлично", "хорошо", "успех"],
+            "грусть": ["грустно", "печаль", "плохо", "убыток"],
+            "злость": ["злой", "недоволен", "разозлился"]
+        }
+        
+        for emotion, keywords in emotional_keywords.items():
+            if any(keyword in text_lower for keyword in keywords):
+                parameters["emotional_state"] = emotion
+                break
+        
+        situation_keywords = {
+            "стабильная": ["стабильн", "нормальн", "хорошо", "все ок"],
+            "критическая": ["критическ", "проблема", "сложно", "трудно"],
+            "растущая": ["растет", "улучшается", "прогресс", "развивается"]
+        }
+        
+        for situation, keywords in situation_keywords.items():
+            if any(keyword in text_lower for keyword in keywords):
+                parameters["financial_situation"] = situation
+                break
+        
+        return parameters
     
     def _format_portfolio_summary(self, portfolio_data: Dict) -> str:
         """Форматирование данных портфеля для промпта"""
@@ -230,7 +705,7 @@ class GigaChatAIClient:
         return "\n".join(lines)
 
 
-def analyze_emotions_with_fallback(text: str, context: Optional[str] = None) -> Dict[str, float]:
+def analyze_emotions_with_fallback(text: str, context: Optional[str] = None) -> Dict:
     """
     Анализ эмоций с fallback на простой анализ
     
@@ -239,19 +714,249 @@ def analyze_emotions_with_fallback(text: str, context: Optional[str] = None) -> 
         context: Дополнительный контекст
         
     Returns:
-        Словарь с вероятностями эмоций
+        Словарь с эмоциями, анализом и вопросами
     """
     client = GigaChatAIClient()
     
     if client._is_available():
         result = client.analyze_emotions(text, context)
-        if result:
+        if result and isinstance(result, dict):
             return result
     
-    return _simple_emotion_analysis(text)
+    emotions = _simple_emotion_analysis(text)
+    return {
+        "emotions": emotions,
+        "analysis": "Простой анализ на основе ключевых слов в тексте. Для более детального анализа рекомендуется использовать GigaChat API.",
+        "questions": [
+            "Какие финансовые цели вы преследуете?",
+            "Что вызывает у вас наибольшее беспокойство в финансовом плане?",
+            "Как вы обычно реагируете на изменения на рынке?"
+        ],
+        "recommendations": "Рекомендуется проконсультироваться с финансовым консультантом для более детального анализа вашей ситуации."
+    }
 
 
-def generate_financial_advice_with_fallback(portfolio_data: Dict, analysis_type: str = "full") -> List[str]:
+def generate_comprehensive_advice_with_fallback(user_message: str, portfolio_data: Optional[Dict] = None, 
+                                                context: Optional[str] = None) -> Dict:
+    """
+    Генерация комплексных финансовых советов с fallback
+    
+    Args:
+        user_message: Сообщение пользователя
+        portfolio_data: Опциональные данные портфеля
+        context: Дополнительный контекст
+        
+    Returns:
+        Словарь с комплексным анализом и рекомендациями
+    """
+    client = GigaChatAIClient()
+    
+    if client._is_available():
+        result = client.generate_comprehensive_advice(user_message, portfolio_data, context)
+        if result and isinstance(result, dict):
+            return result
+    
+    extracted_params = client._extract_parameters_from_message(user_message)
+    
+    return {
+        "comprehensive_analysis": f"Анализ сообщения пользователя с учетом извлеченных параметров. Для более детального анализа рекомендуется использовать GigaChat API.",
+        "financial_goals_analysis": {
+            "identified_goals": extracted_params.get("goals", []),
+            "prioritized_goals": extracted_params.get("goals", [])[:3],
+            "timeframes": {
+                "short_term": "Краткосрочные цели требуют уточнения",
+                "medium_term": "Среднесрочные цели требуют уточнения",
+                "long_term": "Долгосрочные цели требуют уточнения"
+            }
+        },
+        "risk_assessment": {
+            "detected_risk_tolerance": extracted_params.get("risk_tolerance", "не определен"),
+            "risk_analysis": "Для детального анализа рисков рекомендуется использовать GigaChat API.",
+            "recommended_risk_level": "Требуется уточнение"
+        },
+        "emotional_analysis": {
+            "detected_emotions": [extracted_params.get("emotional_state", "нейтральное")],
+            "emotional_impact": "Для анализа влияния эмоций на финансовые решения рекомендуется использовать GigaChat API.",
+            "emotional_management": "Рекомендуется проконсультироваться с финансовым консультантом."
+        },
+        "personalized_recommendations": [
+            {
+                "category": "общее",
+                "priority": "средний",
+                "recommendation": "Для получения персонализированных рекомендаций рекомендуется использовать GigaChat API.",
+                "action_steps": ["Уточнить финансовые цели", "Определить толерантность к риску", "Оценить текущую ситуацию"],
+                "expected_outcome": "Улучшение финансового планирования"
+            }
+        ],
+        "financial_plan": {
+            "current_situation": "Требуется дополнительная информация для оценки ситуации.",
+            "recommended_actions": [],
+            "next_steps": "Рекомендуется использовать GigaChat API для получения детального финансового плана."
+        },
+        "questions_to_clarify": [
+            "Каковы ваши основные финансовые цели?",
+            "Какова ваша толерантность к риску?",
+            "Каков ваш временной горизонт для достижения целей?"
+        ],
+        "warnings_and_considerations": [
+            "Для принятия важных финансовых решений рекомендуется консультация с профессиональным финансовым консультантом."
+        ],
+        "extracted_parameters": extracted_params
+    }
+
+
+def extract_transactions_with_fallback(user_message: str, context: Optional[str] = None) -> Dict:
+    """
+    Извлечение транзакций из сообщения пользователя с fallback
+    
+    Args:
+        user_message: Сообщение пользователя
+        context: Дополнительный контекст
+        
+    Returns:
+        Словарь с извлеченными транзакциями
+    """
+    client = GigaChatAIClient()
+    
+    if client._is_available():
+        result = client.extract_transactions(user_message, context)
+        if result and isinstance(result, dict) and result.get("transactions"):
+            return result
+    
+    return _simple_transaction_extraction(user_message)
+
+
+def _simple_transaction_extraction(message: str) -> Dict:
+    """
+    Простое извлечение транзакций без использования API (fallback)
+    
+    Args:
+        message: Сообщение пользователя
+        
+    Returns:
+        Словарь с извлеченными транзакциями
+    """
+    text_lower = message.lower()
+    transactions = []
+    
+    income_keywords = ["получил", "заработал", "доход", "зарплата", "зарплату", "получила", "заработала", "прибыль"]
+    expense_keywords = ["потратил", "купил", "заплатил", "расход", "трата", "потратила", "купила", "заплатила", "потратил"]
+    
+    is_income = any(keyword in text_lower for keyword in income_keywords)
+    is_expense = any(keyword in text_lower for keyword in expense_keywords)
+    
+    if not is_income and not is_expense:
+        is_expense = True
+    
+    transaction_type = "income" if is_income and not is_expense else "expense"
+    
+    amount_patterns = [
+        r'(\d+[\s,.]?\d*)\s*(рубл[ейя]|rub|₽|р\.|руб)',
+        r'(\d+[\s,.]?\d*)\s*(тысяч|тыс|к|k)',
+        r'(\d+[\s,.]?\d*)\s*(миллион|млн|m)',
+        r'(\d+[\s,.]?\d*)\s*(доллар|usd|\$|бакс)',
+        r'(\d+[\s,.]?\d*)\s*(евро|eur|€)',
+        r'(\d+[\s,.]?\d*)'
+    ]
+    
+    amounts = []
+    for pattern in amount_patterns:
+        matches = re.findall(pattern, text_lower, re.IGNORECASE)
+        for match in matches:
+            amount_str = match[0] if isinstance(match, tuple) else match
+            try:
+                amount = float(amount_str.replace(',', '.').replace(' ', ''))
+                if 'тысяч' in str(match).lower() or 'тыс' in str(match).lower() or 'к' in str(match).lower():
+                    amount *= 1000
+                elif 'миллион' in str(match).lower() or 'млн' in str(match).lower() or 'm' in str(match).lower():
+                    amount *= 1000000
+                if amount > 0:
+                    amounts.append(amount)
+            except ValueError:
+                continue
+    
+    category_keywords = {
+        "Food": ["еда", "продукты", "хлеб", "молоко", "ресторан", "кафе", "обед", "ужин", "завтрак"],
+        "Transport": ["транспорт", "машина", "бензин", "такси", "метро", "автобус", "проезд"],
+        "Entertainment": ["кино", "игры", "развлечения", "отдых", "отпуск", "концерт"],
+        "Health": ["здоровье", "лечение", "врач", "лекарства", "медицина", "аптека", "больница"],
+        "Shopping": ["покупка", "магазин", "одежда", "обувь", "техника"],
+        "Housing": ["жилье", "аренда", "коммунальные", "ремонт", "квартира"],
+        "Work": ["работа", "зарплата", "заработок", "проект", "фриланс"],
+        "Bills": ["счет", "счета", "оплата", "коммуналка", "интернет", "телефон"]
+    }
+    
+    detected_category = "Other"
+    for category, keywords in category_keywords.items():
+        if any(keyword in text_lower for keyword in keywords):
+            detected_category = category
+            break
+    
+    if amounts:
+        for amount in amounts[:3]:
+            transaction = {
+                "type": transaction_type,
+                "title": _extract_title_from_message(message, transaction_type),
+                "amount": float(amount),
+                "category": detected_category,
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "description": message[:100],
+                "confidence": 0.6
+            }
+            transactions.append(transaction)
+    else:
+        transaction = {
+            "type": transaction_type,
+            "title": _extract_title_from_message(message, transaction_type),
+            "amount": None,
+            "category": detected_category,
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "description": message[:100],
+            "confidence": 0.3
+        }
+        transactions.append(transaction)
+    
+    total_income = sum(t["amount"] for t in transactions if t["type"] == "income" and t["amount"])
+    total_expense = sum(t["amount"] for t in transactions if t["type"] == "expense" and t["amount"])
+    
+    return {
+        "transactions": transactions,
+        "extracted_info": {
+            "total_income": total_income,
+            "total_expense": total_expense,
+            "transactions_count": len(transactions),
+            "date_range": {
+                "earliest": transactions[0]["date"] if transactions else None,
+                "latest": transactions[-1]["date"] if transactions else None
+            }
+        },
+        "analysis": "Простое извлечение транзакций на основе ключевых слов. Для более точного извлечения рекомендуется использовать GigaChat API.",
+        "questions": ["Пожалуйста, уточните сумму транзакции", "Укажите точную дату транзакции"] if not amounts else [],
+        "warnings": ["Данные извлечены с помощью простого анализа. Для более точного результата используйте GigaChat API."],
+        "extracted_parameters": {}
+    }
+
+
+def _extract_title_from_message(message: str, transaction_type: str) -> str:
+    """Извлечение названия транзакции из сообщения"""
+    words = message.split()
+    
+    if transaction_type == "income":
+        income_words = ["зарплата", "доход", "прибыль", "заработок"]
+        for word in words:
+            if any(income in word.lower() for income in income_words):
+                return word.capitalize()
+        return "Доход"
+    else:
+        expense_words = ["купил", "потратил", "заплатил", "расход"]
+        for i, word in enumerate(words):
+            if any(expense in word.lower() for expense in expense_words):
+                if i + 1 < len(words):
+                    return words[i + 1].capitalize()
+        return "Расход"
+
+
+def generate_financial_advice_with_fallback(portfolio_data: Dict, analysis_type: str = "full") -> Dict:
     """
     Генерация финансовых советов с fallback
     
@@ -260,16 +965,33 @@ def generate_financial_advice_with_fallback(portfolio_data: Dict, analysis_type:
         analysis_type: Тип анализа
         
     Returns:
-        Список рекомендаций
+        Словарь с рекомендациями, анализом и вопросами
     """
     client = GigaChatAIClient()
     
     if client._is_available():
         result = client.generate_financial_advice(portfolio_data, analysis_type)
-        if result:
+        if result and isinstance(result, dict):
             return result
     
-    return _simple_financial_advice(portfolio_data, analysis_type)
+    recommendations = _simple_financial_advice(portfolio_data, analysis_type)
+    summary = portfolio_data.get("summary", {})
+    risk_metrics = portfolio_data.get("risk_metrics", {})
+    
+    return {
+        "recommendations": recommendations,
+        "detailed_analysis": f"Портфель стоимостью {summary.get('total_value', 0):.2f} RUB показывает {'прибыль' if summary.get('profit_percent', 0) > 0 else 'убыток'} {abs(summary.get('profit_percent', 0)):.2f}%. " +
+                           f"Волатильность портфеля составляет {risk_metrics.get('volatility', 0):.2f}. " +
+                           "Для более детального анализа рекомендуется использовать GigaChat API.",
+        "risk_assessment": f"Уровень риска портфеля: {'высокий' if risk_metrics.get('volatility', 0) > 0.2 else 'средний' if risk_metrics.get('volatility', 0) > 0.1 else 'низкий'}. " +
+                          f"Beta коэффициент: {risk_metrics.get('beta', 0):.2f}.",
+        "questions": [
+            "Каков ваш инвестиционный горизонт?",
+            "Какова ваша толерантность к риску?",
+            "Какие финансовые цели вы хотите достичь с помощью этого портфеля?"
+        ],
+        "next_steps": "Рекомендуется регулярно пересматривать портфель и консультироваться с финансовым консультантом для оптимизации инвестиций."
+    }
 
 
 def _simple_emotion_analysis(text: str) -> Dict[str, float]:

@@ -10,7 +10,7 @@
         <!-- Header with Profile -->
         <Grid Grid.Row="0" Padding="20,50,20,20" ColumnDefinitions="*,Auto">
             <VerticalStackLayout Spacing="4">
-                <Label Text="Welcome back,"
+                <Label Text="С возвращением,"
                        TextColor="{StaticResource TextSecondary}"
                        FontSize="14"/>
                 <Label x:Name="UserNameLabel"
@@ -50,7 +50,7 @@
                         Stroke="Transparent"
                         Padding="20">
                     <VerticalStackLayout Spacing="8">
-                        <Label Text="Total Balance"
+                        <Label Text="Общий баланс"
                                TextColor="{StaticResource TextSecondary}"
                                FontSize="14"/>
                         <Label x:Name="BalanceLabel"
@@ -76,7 +76,7 @@
                                            VerticalOptions="Center"/>
                                 </Border>
                                 <VerticalStackLayout>
-                                    <Label Text="Income"
+                                    <Label Text="Доходы"
                                            TextColor="{StaticResource TextSecondary}"
                                            FontSize="12"/>
                                     <Label x:Name="IncomeLabel"
@@ -103,7 +103,7 @@
                                            VerticalOptions="Center"/>
                                 </Border>
                                 <VerticalStackLayout>
-                                    <Label Text="Expense"
+                                    <Label Text="Расходы"
                                            TextColor="{StaticResource TextSecondary}"
                                            FontSize="12"/>
                                     <Label x:Name="ExpenseLabel"
@@ -124,7 +124,7 @@
                         Padding="15">
                     <VerticalStackLayout Spacing="15">
                         <Grid ColumnDefinitions="*,Auto">
-                            <Label Text="Balance Overview"
+                            <Label Text="Обзор баланса"
                                    TextColor="{StaticResource TextPrimary}"
                                    FontSize="18"
                                    FontAttributes="Bold"
@@ -134,7 +134,7 @@
                                     StrokeShape="RoundRectangle 10"
                                     Stroke="Transparent"
                                     Padding="10,5">
-                                <Label Text="7 Days"
+                                <Label Text="7 дней"
                                        TextColor="{StaticResource TextSecondary}"
                                        FontSize="12"/>
                             </Border>
@@ -150,12 +150,12 @@
                 <!-- Recent Transactions -->
                 <VerticalStackLayout Spacing="15">
                     <Grid ColumnDefinitions="*,Auto">
-                        <Label Text="Recent Transactions"
+                        <Label Text="Последние транзакции"
                                TextColor="{StaticResource TextPrimary}"
                                FontSize="18"
                                FontAttributes="Bold"/>
                         <Label Grid.Column="1"
-                               Text="See All"
+                               Text="Все"
                                TextColor="{StaticResource Primary}"
                                FontSize="14">
                             <Label.GestureRecognizers>

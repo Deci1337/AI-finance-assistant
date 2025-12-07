@@ -12,7 +12,7 @@ import os
 from typing import Dict, List, Optional
 from datetime import datetime
 from mock_data import get_mock_portfolio, calculate_portfolio_metrics
-from gigachat_integration import analyze_emotions_with_fallback, generate_financial_advice_with_fallback
+from gigachat_integration import analyze_emotions_with_fallback, generate_financial_advice_with_fallback, generate_comprehensive_advice_with_fallback, extract_transactions_with_fallback
 
 # Создание экземпляра FastAPI приложения
 app = FastAPI(
@@ -86,6 +86,10 @@ class PortfolioAnalysisResponse(BaseModel):
     recommendations: List[str]
     analysis_date: str
     details: Dict
+    detailed_analysis: Optional[str] = None  # Развернутый анализ портфеля
+    risk_assessment: Optional[str] = None  # Оценка рисков
+    questions: Optional[List[str]] = None  # Наводящие вопросы
+    next_steps: Optional[str] = None  # Следующие шаги
 
 
 class EmotionsAnalysisRequest(BaseModel):
@@ -100,6 +104,49 @@ class EmotionsAnalysisResponse(BaseModel):
     dominant_emotion: str
     sentiment_score: float  # От -1 (негатив) до 1 (позитив)
     analysis_date: str
+    analysis: Optional[str] = None  # Детальный анализ эмоционального состояния
+    questions: Optional[List[str]] = None  # Наводящие вопросы
+    recommendations: Optional[str] = None  # Рекомендации по управлению эмоциями
+
+
+class ComprehensiveAnalysisRequest(BaseModel):
+    """Модель запроса для комплексного анализа"""
+    user_message: str  # Сообщение пользователя с запросом
+    portfolio_data: Optional[Dict] = None  # Опциональные данные портфеля
+    context: Optional[str] = None  # Дополнительный контекст
+
+
+class ComprehensiveAnalysisResponse(BaseModel):
+    """Модель ответа для комплексного анализа"""
+    analysis_id: str
+    analysis_date: str
+    comprehensive_analysis: Optional[str] = None
+    financial_goals_analysis: Optional[Dict] = None
+    risk_assessment: Optional[Dict] = None
+    emotional_analysis: Optional[Dict] = None
+    personalized_recommendations: Optional[List[Dict]] = None
+    financial_plan: Optional[Dict] = None
+    questions_to_clarify: Optional[List[str]] = None
+    warnings_and_considerations: Optional[List[str]] = None
+    extracted_parameters: Optional[Dict] = None
+
+
+class TransactionExtractionRequest(BaseModel):
+    """Модель запроса для извлечения транзакций"""
+    user_message: str  # Сообщение пользователя с информацией о транзакциях
+    context: Optional[str] = None  # Дополнительный контекст
+
+
+class TransactionExtractionResponse(BaseModel):
+    """Модель ответа для извлечения транзакций"""
+    extraction_id: str
+    extraction_date: str
+    transactions: List[Dict]  # Список извлеченных транзакций
+    extracted_info: Optional[Dict] = None  # Общая информация об извлеченных транзакциях
+    analysis: Optional[str] = None  # Анализ извлеченных транзакций
+    questions: Optional[List[str]] = None  # Вопросы для уточнения
+    warnings: Optional[List[str]] = None  # Предупреждения
+    extracted_parameters: Optional[Dict] = None  # Извлеченные параметры
 
 
 # Базовые роуты
@@ -148,8 +195,22 @@ async def analyze_portfolio(request: PortfolioAnalysisRequest) -> PortfolioAnaly
         # Вычисляем метрики портфеля
         metrics = calculate_portfolio_metrics(portfolio_data)
         
-        # Генерируем рекомендации через YandexGPT с fallback
-        ai_recommendations = generate_financial_advice_with_fallback(portfolio_data, request.analysis_type)
+        # Генерируем рекомендации через GigaChat с fallback
+        ai_advice = generate_financial_advice_with_fallback(portfolio_data, request.analysis_type)
+        
+        # Извлекаем данные из ответа AI
+        if isinstance(ai_advice, dict):
+            ai_recommendations = ai_advice.get("recommendations", [])
+            detailed_analysis = ai_advice.get("detailed_analysis")
+            risk_assessment = ai_advice.get("risk_assessment")
+            questions = ai_advice.get("questions")
+            next_steps = ai_advice.get("next_steps")
+        else:
+            ai_recommendations = ai_advice if isinstance(ai_advice, list) else []
+            detailed_analysis = None
+            risk_assessment = None
+            questions = None
+            next_steps = None
         
         # Объединяем рекомендации от AI и базовые метрики
         all_recommendations = ai_recommendations + metrics.get("recommendations", [])
@@ -176,7 +237,11 @@ async def analyze_portfolio(request: PortfolioAnalysisRequest) -> PortfolioAnaly
             risk_score=metrics.get("risk_score", 0.0),
             recommendations=all_recommendations[:10],
             analysis_date=datetime.now().isoformat(),
-            details=details
+            details=details,
+            detailed_analysis=detailed_analysis,
+            risk_assessment=risk_assessment,
+            questions=questions,
+            next_steps=next_steps
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при анализе портфеля: {str(e)}")
@@ -193,25 +258,118 @@ async def analyze_emotions(request: EmotionsAnalysisRequest) -> EmotionsAnalysis
     - Общий сентимент-скор
     """
     try:
-        # Анализ эмоций через YandexGPT с fallback на простой анализ
-        emotions = analyze_emotions_with_fallback(request.text, request.context)
+        # Анализ эмоций через GigaChat с fallback на простой анализ
+        result = analyze_emotions_with_fallback(request.text, request.context)
+        
+        # Извлекаем данные из ответа
+        if isinstance(result, dict) and "emotions" in result:
+            emotions = result["emotions"]
+            analysis = result.get("analysis")
+            questions = result.get("questions")
+            recommendations = result.get("recommendations")
+        else:
+            emotions = result if isinstance(result, dict) else {}
+            analysis = None
+            questions = None
+            recommendations = None
         
         # Определение доминирующей эмоции
-        dominant_emotion = max(emotions, key=emotions.get)
+        dominant_emotion = max(emotions, key=emotions.get) if emotions else "neutral"
         
         # Расчет сентимент-скора
         positive_emotions = emotions.get("joy", 0) + emotions.get("surprise", 0)
         negative_emotions = emotions.get("fear", 0) + emotions.get("anger", 0) + emotions.get("sadness", 0)
-        sentiment_score = (positive_emotions - negative_emotions) / (positive_emotions + negative_emotions + 0.1)
+        sentiment_score = (positive_emotions - negative_emotions) / (positive_emotions + negative_emotions + 0.1) if (positive_emotions + negative_emotions) > 0 else 0.0
         
         return EmotionsAnalysisResponse(
             emotions=emotions,
             dominant_emotion=dominant_emotion,
             sentiment_score=sentiment_score,
-            analysis_date=datetime.now().isoformat()
+            analysis_date=datetime.now().isoformat(),
+            analysis=analysis,
+            questions=questions,
+            recommendations=recommendations
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при анализе эмоций: {str(e)}")
+
+
+@app.post("/comprehensive-analysis", response_model=ComprehensiveAnalysisResponse)
+async def comprehensive_analysis(request: ComprehensiveAnalysisRequest) -> ComprehensiveAnalysisResponse:
+    """
+    Комплексный анализ финансовой ситуации с учетом множества параметров
+    
+    Анализирует сообщение пользователя, извлекает параметры и предоставляет:
+    - Комплексный анализ ситуации
+    - Анализ финансовых целей
+    - Оценку рисков
+    - Эмоциональный анализ
+    - Персонализированные рекомендации
+    - Финансовый план
+    """
+    try:
+        result = generate_comprehensive_advice_with_fallback(
+            request.user_message,
+            request.portfolio_data,
+            request.context
+        )
+        
+        analysis_id = f"comprehensive_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        return ComprehensiveAnalysisResponse(
+            analysis_id=analysis_id,
+            analysis_date=datetime.now().isoformat(),
+            comprehensive_analysis=result.get("comprehensive_analysis"),
+            financial_goals_analysis=result.get("financial_goals_analysis"),
+            risk_assessment=result.get("risk_assessment"),
+            emotional_analysis=result.get("emotional_analysis"),
+            personalized_recommendations=result.get("personalized_recommendations"),
+            financial_plan=result.get("financial_plan"),
+            questions_to_clarify=result.get("questions_to_clarify"),
+            warnings_and_considerations=result.get("warnings_and_considerations"),
+            extracted_parameters=result.get("extracted_parameters")
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при комплексном анализе: {str(e)}")
+
+
+@app.post("/extract-transactions", response_model=TransactionExtractionResponse)
+async def extract_transactions(request: TransactionExtractionRequest) -> TransactionExtractionResponse:
+    """
+    Извлечение транзакций (расходов и доходов) из сообщения пользователя
+    
+    Анализирует сообщение пользователя и извлекает структурированную информацию о транзакциях:
+    - Тип транзакции (доход/расход)
+    - Сумма
+    - Категория
+    - Дата
+    - Название/описание
+    
+    Примеры сообщений:
+    - "Купил хлеб за 50 рублей и молоко за 80 рублей"
+    - "Получил зарплату 85000 рублей"
+    - "Вчера потратил 2000 на обед в ресторане"
+    """
+    try:
+        result = extract_transactions_with_fallback(
+            request.user_message,
+            request.context
+        )
+        
+        extraction_id = f"extraction_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        return TransactionExtractionResponse(
+            extraction_id=extraction_id,
+            extraction_date=datetime.now().isoformat(),
+            transactions=result.get("transactions", []),
+            extracted_info=result.get("extracted_info"),
+            analysis=result.get("analysis"),
+            questions=result.get("questions"),
+            warnings=result.get("warnings"),
+            extracted_parameters=result.get("extracted_parameters")
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при извлечении транзакций: {str(e)}")
 
 
 # Дополнительные служебные эндпоинты
