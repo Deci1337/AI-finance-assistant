@@ -823,6 +823,28 @@ class GigaChatAIClient:
         """Извлечение JSON из текста ответа с улучшенной обработкой"""
         import json
         
+        # Сначала проверяем, есть ли JSON в markdown блоке (```json ... ```)
+        markdown_json_match = re.search(r'```json\s*(\{.*?\}|\[.*?\])\s*```', text, re.DOTALL)
+        if markdown_json_match:
+            json_str = markdown_json_match.group(1)
+            json_str = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', json_str)
+            try:
+                json.loads(json_str)
+                return json_str
+            except json.JSONDecodeError:
+                pass
+        
+        # Также проверяем markdown блок без указания языка (``` ... ```)
+        markdown_match = re.search(r'```\s*(\{.*?\}|\[.*?\])\s*```', text, re.DOTALL)
+        if markdown_match:
+            json_str = markdown_match.group(1)
+            json_str = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', json_str)
+            try:
+                json.loads(json_str)
+                return json_str
+            except json.JSONDecodeError:
+                pass
+        
         # Сначала пробуем простой поиск JSON объекта или массива
         json_match = re.search(r'\{.*\}|\[.*\]', text, re.DOTALL)
         
