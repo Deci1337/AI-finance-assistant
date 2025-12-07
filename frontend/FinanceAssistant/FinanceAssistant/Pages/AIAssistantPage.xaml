@@ -68,7 +68,7 @@
         <Border Grid.Row="2"
                 BackgroundColor="{StaticResource BackgroundCard}"
                 Padding="15,15,15,30">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
                 <Border BackgroundColor="{StaticResource BackgroundElevated}"
                         StrokeShape="RoundRectangle 25"
                         Stroke="Transparent"
@@ -83,7 +83,26 @@
                            Completed="OnSendMessage"/>
                 </Border>
                 
-                <Border Grid.Column="1"
+                <!-- Voice Input Button -->
+                <Border x:Name="MicButton"
+                        Grid.Column="1"
+                        BackgroundColor="{StaticResource BackgroundElevated}"
+                        StrokeShape="RoundRectangle 25"
+                        Stroke="Transparent"
+                        HeightRequest="50"
+                        WidthRequest="50">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnMicTapped"/>
+                    </Border.GestureRecognizers>
+                    <Label x:Name="MicIcon"
+                           Text="&#127908;"
+                           FontSize="22"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"/>
+                </Border>
+                
+                <!-- Send Button -->
+                <Border Grid.Column="2"
                         BackgroundColor="{StaticResource Primary}"
                         StrokeShape="RoundRectangle 25"
                         Stroke="Transparent"

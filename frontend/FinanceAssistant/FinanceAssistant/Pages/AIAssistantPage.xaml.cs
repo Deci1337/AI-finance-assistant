@@ -8,6 +8,8 @@ namespace FinanceAssistant.Pages
         private readonly ApiService _apiService;
         private readonly DatabaseService _databaseService;
         private bool _isWaitingForResponse;
+        private bool _isRecording;
+        private MemoryStream? _audioStream;
 
         public AIAssistantPage(DatabaseService databaseService)
         {
@@ -193,6 +195,57 @@ namespace FinanceAssistant.Pages
         private void OnSendTapped(object? sender, EventArgs e)
         {
             _ = SendMessageAsync();
+        }
+
+        private void OnMicTapped(object? sender, EventArgs e)
+        {
+            _isRecording = !_isRecording;
+            UpdateMicButtonState();
+            
+            if (_isRecording)
+            {
+                StartRecording();
+            }
+            else
+            {
+                StopRecording();
+            }
+        }
+
+        private void UpdateMicButtonState()
+        {
+            if (_isRecording)
+            {
+                MicButton.BackgroundColor = Color.FromArgb("#FF4444");
+                MicIcon.Text = "\u23F9"; // Stop symbol
+            }
+            else
+            {
+                MicButton.BackgroundColor = Color.FromArgb("#21262D");
+                MicIcon.Text = "\uD83C\uDFA4"; // Microphone emoji
+            }
+        }
+
+        private void StartRecording()
+        {
+            _audioStream = new MemoryStream();
+            AddSystemMessage("Recording...");
+            // TODO: Implement actual audio recording with platform-specific code
+        }
+
+        private void StopRecording()
+        {
+            AddSystemMessage("Recording stopped");
+            
+            if (_audioStream != null && _audioStream.Length > 0)
+            {
+                // TODO: Send audio to backend for speech-to-text
+                // For now just show that we have audio data
+                AddSystemMessage($"Audio captured: {_audioStream.Length} bytes");
+            }
+            
+            _audioStream?.Dispose();
+            _audioStream = null;
         }
 
         private async Task SendMessageAsync()
