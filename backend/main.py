@@ -12,6 +12,7 @@ import os
 from typing import Dict, List, Optional
 from datetime import datetime
 from mock_data import get_mock_portfolio, calculate_portfolio_metrics
+from gigachat_integration import analyze_emotions_with_fallback, generate_financial_advice_with_fallback
 
 # Создание экземпляра FastAPI приложения
 app = FastAPI(
@@ -147,6 +148,12 @@ async def analyze_portfolio(request: PortfolioAnalysisRequest) -> PortfolioAnaly
         # Вычисляем метрики портфеля
         metrics = calculate_portfolio_metrics(portfolio_data)
         
+        # Генерируем рекомендации через YandexGPT с fallback
+        ai_recommendations = generate_financial_advice_with_fallback(portfolio_data, request.analysis_type)
+        
+        # Объединяем рекомендации от AI и базовые метрики
+        all_recommendations = ai_recommendations + metrics.get("recommendations", [])
+        
         # Генерируем ID анализа
         analysis_id = f"analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
@@ -155,7 +162,8 @@ async def analyze_portfolio(request: PortfolioAnalysisRequest) -> PortfolioAnaly
             "analysis_type": request.analysis_type,
             "assets_count": metrics.get("assets_count", 0),
             "sectors_distribution": metrics.get("sectors_distribution", {}),
-            "is_mock_data": is_mock
+            "is_mock_data": is_mock,
+            "ai_recommendations_count": len(ai_recommendations)
         }
         
         # Добавляем полные данные портфеля в детали (если не слишком большие)
@@ -166,7 +174,7 @@ async def analyze_portfolio(request: PortfolioAnalysisRequest) -> PortfolioAnaly
             analysis_id=analysis_id,
             portfolio_value=metrics.get("portfolio_value", 0.0),
             risk_score=metrics.get("risk_score", 0.0),
-            recommendations=metrics.get("recommendations", []),
+            recommendations=all_recommendations[:10],
             analysis_date=datetime.now().isoformat(),
             details=details
         )
@@ -185,25 +193,13 @@ async def analyze_emotions(request: EmotionsAnalysisRequest) -> EmotionsAnalysis
     - Общий сентимент-скор
     """
     try:
-        # TODO: Реализовать логику анализа эмоций
-        # Здесь будет интеграция с NLP моделями для анализа эмоций
-        
-        # Временная заглушка для демонстрации структуры
-        # Пример анализа эмоций (заменить на реальную логику)
-        emotions = {
-            "joy": 0.3,
-            "fear": 0.2,
-            "anger": 0.1,
-            "sadness": 0.15,
-            "surprise": 0.1,
-            "neutral": 0.15
-        }
+        # Анализ эмоций через YandexGPT с fallback на простой анализ
+        emotions = analyze_emotions_with_fallback(request.text, request.context)
         
         # Определение доминирующей эмоции
         dominant_emotion = max(emotions, key=emotions.get)
         
-        # Расчет сентимент-скора (примерная формула)
-        # Положительные эмоции увеличивают скор, отрицательные уменьшают
+        # Расчет сентимент-скора
         positive_emotions = emotions.get("joy", 0) + emotions.get("surprise", 0)
         negative_emotions = emotions.get("fear", 0) + emotions.get("anger", 0) + emotions.get("sadness", 0)
         sentiment_score = (positive_emotions - negative_emotions) / (positive_emotions + negative_emotions + 0.1)
