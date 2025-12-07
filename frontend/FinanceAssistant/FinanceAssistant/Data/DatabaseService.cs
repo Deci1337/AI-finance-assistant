@@ -339,6 +339,133 @@ namespace FinanceAssistant.Data
 
             return data;
         }
+
+        // Generate test data for November and December
+        public async Task<int> SeedTestDataAsync()
+        {
+            await InitAsync();
+            var random = new Random(42); // Fixed seed for reproducibility
+            var categories = await GetCategoriesAsync();
+            var expenseCategories = categories.Where(c => c.Type == TransactionType.Expense).ToList();
+            var incomeCategories = categories.Where(c => c.Type == TransactionType.Income).ToList();
+            
+            var testTransactions = new List<Transaction>();
+            
+            // Expense templates with realistic amounts
+            var expenseTemplates = new (string title, int minAmount, int maxAmount, string category)[]
+            {
+                ("Groceries", 500, 3000, "Food"),
+                ("Coffee", 150, 400, "Food"),
+                ("Lunch", 300, 800, "Food"),
+                ("Dinner", 500, 2000, "Food"),
+                ("Metro", 50, 100, "Transport"),
+                ("Taxi", 200, 800, "Transport"),
+                ("Gas", 1500, 3000, "Transport"),
+                ("Cinema", 400, 800, "Entertainment"),
+                ("Subscription", 200, 600, "Entertainment"),
+                ("Games", 500, 2000, "Entertainment"),
+                ("Pharmacy", 300, 1500, "Health"),
+                ("Doctor", 1000, 5000, "Health"),
+                ("Clothes", 1500, 8000, "Shopping"),
+                ("Electronics", 2000, 15000, "Shopping"),
+                ("Utilities", 3000, 6000, "Bills"),
+                ("Internet", 500, 1000, "Bills"),
+                ("Phone", 300, 700, "Bills"),
+                ("Course", 2000, 10000, "Education"),
+                ("Books", 300, 1500, "Education"),
+                ("Other expense", 200, 2000, "Other"),
+            };
+            
+            // Income templates
+            var incomeTemplates = new (string title, int minAmount, int maxAmount, string category)[]
+            {
+                ("Salary", 80000, 120000, "Salary"),
+                ("Freelance project", 5000, 30000, "Freelance"),
+                ("Dividends", 1000, 10000, "Investment"),
+                ("Gift from family", 1000, 5000, "Gift"),
+                ("Cashback", 200, 1000, "Other Income"),
+            };
+            
+            // Generate for November 2024
+            var novemberStart = new DateTime(2024, 11, 1);
+            var novemberDays = 30;
+            
+            // Generate for December 2024
+            var decemberStart = new DateTime(2024, 12, 1);
+            var decemberDays = DateTime.Now.Month == 12 ? DateTime.Now.Day : 31;
+            
+            void GenerateMonthData(DateTime monthStart, int daysInMonth)
+            {
+                // Add 1-2 income transactions per month
+                var salaryDay = random.Next(1, 10);
+                var salaryCategory = incomeCategories.FirstOrDefault(c => c.Name == "Salary");
+                if (salaryCategory != null)
+                {
+                    testTransactions.Add(new Transaction
+                    {
+                        Title = "Salary",
+                        Amount = random.Next(80000, 120000),
+                        Type = TransactionType.Income,
+                        CategoryId = salaryCategory.Id,
+                        Date = monthStart.AddDays(salaryDay - 1),
+                        Importance = ImportanceLevel.High
+                    });
+                }
+                
+                // Add random additional income (0-2 per month)
+                var extraIncomes = random.Next(0, 3);
+                for (int i = 0; i < extraIncomes; i++)
+                {
+                    var template = incomeTemplates[random.Next(1, incomeTemplates.Length)];
+                    var cat = incomeCategories.FirstOrDefault(c => c.Name == template.category);
+                    if (cat != null)
+                    {
+                        testTransactions.Add(new Transaction
+                        {
+                            Title = template.title,
+                            Amount = random.Next(template.minAmount, template.maxAmount),
+                            Type = TransactionType.Income,
+                            CategoryId = cat.Id,
+                            Date = monthStart.AddDays(random.Next(0, daysInMonth)),
+                            Importance = ImportanceLevel.Medium
+                        });
+                    }
+                }
+                
+                // Add 30-50 expense transactions per month
+                var expenseCount = random.Next(30, 51);
+                for (int i = 0; i < expenseCount; i++)
+                {
+                    var template = expenseTemplates[random.Next(expenseTemplates.Length)];
+                    var cat = expenseCategories.FirstOrDefault(c => c.Name == template.category);
+                    if (cat != null)
+                    {
+                        testTransactions.Add(new Transaction
+                        {
+                            Title = template.title,
+                            Amount = random.Next(template.minAmount, template.maxAmount),
+                            Type = TransactionType.Expense,
+                            CategoryId = cat.Id,
+                            Date = monthStart.AddDays(random.Next(0, daysInMonth)),
+                            Importance = (ImportanceLevel)random.Next(0, 3)
+                        });
+                    }
+                }
+            }
+            
+            GenerateMonthData(novemberStart, novemberDays);
+            GenerateMonthData(decemberStart, decemberDays);
+            
+            await _database!.InsertAllAsync(testTransactions);
+            return testTransactions.Count;
+        }
+
+        // Clear all test data
+        public async Task ClearAllTransactionsAsync()
+        {
+            await InitAsync();
+            await _database!.DeleteAllAsync<Transaction>();
+        }
     }
 }
 

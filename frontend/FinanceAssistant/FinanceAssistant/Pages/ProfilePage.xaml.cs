@@ -130,5 +130,47 @@ namespace FinanceAssistant.Pages
         {
             await Shell.Current.GoToAsync("..");
         }
+
+        private async void OnGenerateTestDataTapped(object? sender, EventArgs e)
+        {
+            bool confirm = await DisplayAlert(
+                "Generate Test Data",
+                "This will add random transactions for November and December 2024. Continue?",
+                "Yes", "Cancel");
+            
+            if (!confirm) return;
+            
+            try
+            {
+                int count = await _databaseService.SeedTestDataAsync();
+                await DisplayAlert("Success", $"Added {count} test transactions!", "OK");
+                await LoadProfileAsync();
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("Error", $"Failed to generate data: {ex.Message}", "OK");
+            }
+        }
+
+        private async void OnClearDataTapped(object? sender, EventArgs e)
+        {
+            bool confirm = await DisplayAlert(
+                "Clear All Data",
+                "This will delete ALL transactions. This cannot be undone. Continue?",
+                "Delete All", "Cancel");
+            
+            if (!confirm) return;
+            
+            try
+            {
+                await _databaseService.ClearAllTransactionsAsync();
+                await DisplayAlert("Success", "All transactions deleted!", "OK");
+                await LoadProfileAsync();
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("Error", $"Failed to clear data: {ex.Message}", "OK");
+            }
+        }
     }
 }

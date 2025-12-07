@@ -318,6 +318,51 @@
                            HorizontalOptions="Center"/>
                 </Border>
 
+                <!-- Dev Tools Section -->
+                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                        StrokeShape="RoundRectangle 20"
+                        Stroke="Transparent"
+                        Padding="20">
+                    <VerticalStackLayout Spacing="15">
+                        <Label Text="Developer Tools"
+                               TextColor="{StaticResource TextSecondary}"
+                               FontSize="14"/>
+                        
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <!-- Generate Test Data -->
+                            <Border BackgroundColor="#2D5A27"
+                                    StrokeShape="RoundRectangle 15"
+                                    Stroke="Transparent"
+                                    Padding="15,12">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnGenerateTestDataTapped"/>
+                                </Border.GestureRecognizers>
+                                <Label Text="+ Test Data"
+                                       TextColor="{StaticResource TextPrimary}"
+                                       FontSize="14"
+                                       FontAttributes="Bold"
+                                       HorizontalOptions="Center"/>
+                            </Border>
+                            
+                            <!-- Clear All Data -->
+                            <Border Grid.Column="1"
+                                    BackgroundColor="#5A2727"
+                                    StrokeShape="RoundRectangle 15"
+                                    Stroke="Transparent"
+                                    Padding="15,12">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnClearDataTapped"/>
+                                </Border.GestureRecognizers>
+                                <Label Text="Clear Data"
+                                       TextColor="{StaticResource TextPrimary}"
+                                       FontSize="14"
+                                       FontAttributes="Bold"
+                                       HorizontalOptions="Center"/>
+                            </Border>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
                 <BoxView HeightRequest="30" Color="Transparent"/>
             </VerticalStackLayout>
         </ScrollView>
