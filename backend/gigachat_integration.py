@@ -9,7 +9,7 @@ import json
 import re
 import base64
 from typing import Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -1866,6 +1866,642 @@ def _simple_emotion_analysis(text: str) -> Dict[str, float]:
     
     total = sum(emotions.values())
     return {k: v / total for k, v in emotions.items()}
+
+
+def analyze_friendliness_with_fallback(text: str) -> Dict:
+    """
+    Анализ доброты/дружелюбности сообщения с fallback на простой анализ
+    
+    Args:
+        text: Текст для анализа
+        
+    Returns:
+        Словарь с оценкой доброты (0.0 - 1.0), сентиментом и временной меткой
+    """
+    client = GigaChatAIClient()
+    
+    if client._is_available():
+        try:
+            token = get_access_token()
+            if token:
+                prompt = f"""Проанализируй сообщение пользователя и оцени его доброту/дружелюбность по шкале от 0.0 до 1.0, где:
+- 0.0 - очень грубое, агрессивное, невежливое сообщение
+- 0.5 - нейтральное сообщение
+- 1.0 - очень дружелюбное, вежливое, позитивное сообщение
+
+Сообщение: {text}
+
+Верни ответ ТОЛЬКО в формате JSON:
+{{
+    "friendliness_score": число от 0.0 до 1.0,
+    "sentiment": "positive" | "neutral" | "negative"
+}}
+
+Не добавляй никакого другого текста, только JSON."""
+
+                url = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
+                headers = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Authorization': f'Bearer {token}'
+                }
+                
+                payload = {
+                    'model': MODEL,
+                    'messages': [
+                        {
+                            'role': 'user',
+                            'content': prompt
+                        }
+                    ],
+                    'temperature': 0.3,
+                    'max_tokens': 200
+                }
+                
+                response = requests.post(url, headers=headers, json=payload, verify=False, timeout=10)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'choices' in result and len(result['choices']) > 0:
+                        content = result['choices'][0].get('message', {}).get('content', '')
+                        # Извлекаем JSON из ответа
+                        json_match = re.search(r'\{[^}]+\}', content)
+                        if json_match:
+                            friendliness_data = json.loads(json_match.group())
+                            friendliness_score = friendliness_data.get('friendliness_score', 0.5)
+                            sentiment = friendliness_data.get('sentiment', 'neutral')
+                            
+                            return {
+                                "friendliness_score": max(0.0, min(1.0, float(friendliness_score))),
+                                "sentiment": sentiment,
+                                "timestamp": datetime.now().isoformat()
+                            }
+        except Exception as e:
+            print(f"GigaChat friendliness analysis error: {str(e)}")
+    
+    # Fallback на простой анализ
+    return _simple_friendliness_analysis(text)
+
+
+def _simple_friendliness_analysis(text: str) -> Dict:
+    """
+    Простой анализ доброты без использования API (fallback)
+    
+    Args:
+        text: Текст для анализа
+        
+    Returns:
+        Словарь с оценкой доброты, сентиментом и временной меткой
+    """
+    text_lower = text.lower()
+    
+    # Позитивные слова увеличивают доброту
+    positive_words = ["пожалуйста", "спасибо", "благодарю", "извините", "простите", 
+                      "добрый", "хороший", "отлично", "замечательно", "рад", "счастлив"]
+    
+    # Негативные слова уменьшают доброту
+    negative_words = ["дурак", "идиот", "тупой", "плохо", "ужасно", "ненавижу", 
+                     "ненависть", "злой", "злюсь", "разозлился", "грубо"]
+    
+    # Грубые слова сильно уменьшают доброту
+    rude_words = ["блять", "ебан", "сука", "хуй", "пизд", "нахуй"]
+    
+    positive_count = sum(1 for word in positive_words if word in text_lower)
+    negative_count = sum(1 for word in negative_words if word in text_lower)
+    rude_count = sum(1 for word in rude_words if word in text_lower)
+    
+    # Базовая оценка 0.5 (нейтральная)
+    friendliness_score = 0.5
+    
+    # Позитивные слова увеличивают оценку
+    friendliness_score += positive_count * 0.1
+    
+    # Негативные слова уменьшают оценку
+    friendliness_score -= negative_count * 0.15
+    
+    # Грубые слова сильно уменьшают оценку
+    friendliness_score -= rude_count * 0.3
+    
+    # Ограничиваем диапазон от 0.0 до 1.0
+    friendliness_score = max(0.0, min(1.0, friendliness_score))
+    
+    # Определяем сентимент
+    if friendliness_score >= 0.6:
+        sentiment = "positive"
+    elif friendliness_score <= 0.4:
+        sentiment = "negative"
+    else:
+        sentiment = "neutral"
+    
+    return {
+        "friendliness_score": friendliness_score,
+        "sentiment": sentiment,
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+def generate_insights_with_fallback(transactions: List[Dict], current_month: Optional[str] = None) -> Optional[Dict]:
+    """
+    Генерация персональных инсайтов на основе транзакций пользователя
+    
+    Args:
+        transactions: Список транзакций с полями: title, amount, category, date, importance, type
+        current_month: Текущий месяц для анализа (опционально)
+        
+    Returns:
+        Словарь с инсайтом или None
+    """
+    if not transactions or len(transactions) == 0:
+        return None
+    
+    client = GigaChatAIClient()
+    
+    if client._is_available():
+        try:
+            token = get_access_token()
+            if token:
+                # Анализируем транзакции для поиска паттернов
+                expense_transactions = [t for t in transactions if t.get('type') == 'expense' or t.get('type') == 1]
+                
+                if len(expense_transactions) < 3:
+                    return None
+                
+                # Группируем по категориям и важности
+                category_stats = {}
+                for t in expense_transactions:
+                    category = t.get('category', 'Other')
+                    importance = t.get('importance', 'medium')
+                    amount = float(t.get('amount', 0))
+                    
+                    if category not in category_stats:
+                        category_stats[category] = {
+                            'total': 0,
+                            'count': 0,
+                            'low_importance_count': 0,
+                            'titles': []
+                        }
+                    
+                    category_stats[category]['total'] += amount
+                    category_stats[category]['count'] += 1
+                    category_stats[category]['titles'].append(t.get('title', ''))
+                    
+                    if importance == 'low' or importance == 0:
+                        category_stats[category]['low_importance_count'] += 1
+                
+                # Находим категории с паттернами для инсайтов
+                insights_candidates = []
+                for category, stats in category_stats.items():
+                    if stats['count'] >= 2 and stats['low_importance_count'] >= 2:
+                        # Есть повторяющиеся покупки с низкой важностью
+                        insights_candidates.append({
+                            'category': category,
+                            'total': stats['total'],
+                            'count': stats['count'],
+                            'low_importance_count': stats['low_importance_count'],
+                            'titles': stats['titles']
+                        })
+                
+                if not insights_candidates:
+                    return None
+                
+                # Берем первую категорию с паттерном
+                candidate = insights_candidates[0]
+                
+                # Формируем промпт для генерации инсайта
+                prompt = f"""Проанализируй паттерн покупок пользователя и создай персональный инсайт.
+
+Данные:
+- Категория: {candidate['category']}
+- Количество покупок: {candidate['count']}
+- Из них с низкой важностью (необязательные): {candidate['low_importance_count']}
+- Общая сумма за текущий месяц: {candidate['total']:.0f} рублей
+- Примеры покупок: {', '.join(candidate['titles'][:5])}
+
+Создай краткий инсайт (2-3 предложения) в дружелюбном тоне, который:
+1. Обращает внимание на паттерн (например, "Заметил, что вы несколько раз оценивали {candidate['category']} как необязательную покупку")
+2. Приводит конкретные цифры ("В этом месяце на {candidate['category']} ушло {candidate['total']:.0f}₽")
+3. Дает практическую рекомендацию ("Возможно, стоит попробовать альтернативный продукт или покупать реже?")
+
+Верни ТОЛЬКО текст инсайта без дополнительных комментариев."""
+
+                url = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
+                headers = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Authorization': f'Bearer {token}'
+                }
+                
+                payload = {
+                    'model': MODEL,
+                    'messages': [
+                        {
+                            'role': 'user',
+                            'content': prompt
+                        }
+                    ],
+                    'temperature': 0.7,
+                    'max_tokens': 300
+                }
+                
+                response = requests.post(url, headers=headers, json=payload, verify=False, timeout=15)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'choices' in result and len(result['choices']) > 0:
+                        insight_text = result['choices'][0].get('message', {}).get('content', '').strip()
+                        
+                        if insight_text:
+                            # Вычисляем дополнительную аналитику
+                            category_transactions = [t for t in transactions if t.get('category') == candidate['category']]
+                            
+                            # Статистика по категории
+                            total_spent = candidate['total']
+                            transaction_count = candidate['count']
+                            low_importance_count = candidate['low_importance_count']
+                            low_importance_percent = (low_importance_count / transaction_count * 100) if transaction_count > 0 else 0
+                            
+                            # Сравнение с предыдущим месяцем (если есть данные)
+                            previous_month_total = 0
+                            if current_month:
+                                try:
+                                    year, month = map(int, current_month.split('-'))
+                                    prev_month = month - 1
+                                    prev_year = year
+                                    if prev_month == 0:
+                                        prev_month = 12
+                                        prev_year -= 1
+                                    
+                                    prev_month_transactions = [t for t in transactions 
+                                                               if t.get('date', '').startswith(f"{prev_year}-{prev_month:02d}") 
+                                                               and t.get('category') == candidate['category']]
+                                    previous_month_total = sum(float(t.get('amount', 0)) for t in prev_month_transactions)
+                                except:
+                                    pass
+                            
+                            # Процент от общих расходов текущего месяца
+                            current_month_expenses = [t for t in transactions 
+                                                     if t.get('type') == 'expense' or t.get('type') == 1]
+                            total_expenses = sum(float(t.get('amount', 0)) for t in current_month_expenses)
+                            percent_of_total = (total_spent / total_expenses * 100) if total_expenses > 0 else 0
+                            
+                            return {
+                                "insight": insight_text,
+                                "category": candidate['category'],
+                                "amount": total_spent,
+                                "transaction_count": transaction_count,
+                                "low_importance_count": low_importance_count,
+                                "low_importance_percent": round(low_importance_percent, 1),
+                                "previous_month_amount": previous_month_total,
+                                "percent_of_total": round(percent_of_total, 1),
+                                "timestamp": datetime.now().isoformat()
+                            }
+        except Exception as e:
+            print(f"GigaChat insights generation error: {str(e)}")
+    
+    # Fallback на простой инсайт
+    return _simple_insight_generation(transactions)
+
+
+def _simple_insight_generation(transactions: List[Dict]) -> Optional[Dict]:
+    """
+    Простая генерация инсайта без использования API (fallback)
+    
+    Args:
+        transactions: Список транзакций
+        
+    Returns:
+        Словарь с инсайтом или None
+    """
+    expense_transactions = [t for t in transactions if t.get('type') == 'expense' or t.get('type') == 1]
+    
+    if len(expense_transactions) < 3:
+        return None
+    
+    # Группируем по категориям
+    category_stats = {}
+    for t in expense_transactions:
+        category = t.get('category', 'Other')
+        importance = t.get('importance', 'medium')
+        amount = float(t.get('amount', 0))
+        
+        if category not in category_stats:
+            category_stats[category] = {
+                'total': 0,
+                'count': 0,
+                'low_importance_count': 0
+            }
+        
+        category_stats[category]['total'] += amount
+        category_stats[category]['count'] += 1
+        
+        if importance == 'low' or importance == 0:
+            category_stats[category]['low_importance_count'] += 1
+    
+    # Находим категорию с паттерном
+    for category, stats in category_stats.items():
+        if stats['count'] >= 2 and stats['low_importance_count'] >= 2:
+            low_importance_percent = (stats['low_importance_count'] / stats['count'] * 100) if stats['count'] > 0 else 0
+            
+            # Вычисляем процент от общих расходов
+            total_expenses = sum(float(t.get('amount', 0)) for t in expense_transactions)
+            percent_of_total = (stats['total'] / total_expenses * 100) if total_expenses > 0 else 0
+            
+            return {
+                "insight": f"Заметил, что вы несколько раз оценивали {category} как необязательную покупку. В этом месяце на {category} ушло {stats['total']:.0f}₽. Возможно, стоит попробовать альтернативный продукт или покупать реже?",
+                "category": category,
+                "amount": stats['total'],
+                "transaction_count": stats['count'],
+                "low_importance_count": stats['low_importance_count'],
+                "low_importance_percent": round(low_importance_percent, 1),
+                "previous_month_amount": 0,
+                "percent_of_total": round(percent_of_total, 1),
+                "timestamp": datetime.now().isoformat()
+            }
+    
+    return None
+
+
+def generate_forecast_with_fallback(transactions: List[Dict], user_message: str, months: int = 3) -> Optional[Dict]:
+    """
+    Генерация прогноза расходов на основе изменений в категориях
+    
+    Args:
+        transactions: Список транзакций пользователя
+        user_message: Сообщение пользователя с запросом на прогноз
+        months: Количество месяцев для прогноза
+        
+    Returns:
+        Словарь с прогнозом или None
+    """
+    if not transactions or len(transactions) == 0:
+        return None
+    
+    client = GigaChatAIClient()
+    
+    if client._is_available():
+        try:
+            token = get_access_token()
+            if token:
+                # Анализируем текущие расходы по категориям
+                expense_transactions = [t for t in transactions if t.get('type') == 'expense' or t.get('type') == 1]
+                
+                if len(expense_transactions) < 3:
+                    return None
+                
+                # Группируем по категориям и вычисляем средние месячные расходы
+                category_stats = {}
+                for t in expense_transactions:
+                    category = t.get('category', 'Other')
+                    amount = float(t.get('amount', 0))
+                    date_str = t.get('date', '')
+                    
+                    if category not in category_stats:
+                        category_stats[category] = {
+                            'total': 0,
+                            'count': 0,
+                            'months': set()
+                        }
+                    
+                    category_stats[category]['total'] += amount
+                    category_stats[category]['count'] += 1
+                    
+                    # Извлекаем месяц из даты
+                    try:
+                        if date_str:
+                            date_parts = date_str.split('-')
+                            if len(date_parts) >= 2:
+                                month_key = f"{date_parts[0]}-{date_parts[1]}"
+                                category_stats[category]['months'].add(month_key)
+                    except:
+                        pass
+                
+                # Вычисляем средние месячные расходы по категориям
+                category_monthly_avg = {}
+                for category, stats in category_stats.items():
+                    month_count = len(stats['months']) if stats['months'] else 1
+                    category_monthly_avg[category] = stats['total'] / month_count if month_count > 0 else stats['total']
+                
+                # Извлекаем информацию о запросе пользователя
+                prompt = f"""Проанализируй запрос пользователя и извлеки информацию о прогнозировании расходов.
+
+ЗАПРОС ПОЛЬЗОВАТЕЛЯ: {user_message}
+
+ТЕКУЩИЕ СРЕДНИЕ МЕСЯЧНЫЕ РАСХОДЫ ПО КАТЕГОРИЯМ:
+{json.dumps(category_monthly_avg, ensure_ascii=False, indent=2)}
+
+ИНСТРУКЦИИ:
+1. Определи, какие категории и на сколько процентов нужно изменить (уменьшить/увеличить)
+2. Если процент не указан, используй разумное значение (например, 25% для уменьшения)
+3. Если категория не указана явно, попробуй определить по контексту
+4. Если количество месяцев не указано, используй {months} месяца
+
+Верни ответ ТОЛЬКО в формате JSON:
+{{
+    "category": "название категории",
+    "change_percent": число (положительное для увеличения, отрицательное для уменьшения),
+    "months": число месяцев для прогноза
+}}
+
+Не добавляй никакого другого текста, только JSON."""
+
+                url = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
+                headers = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Authorization': f'Bearer {token}'
+                }
+                
+                payload = {
+                    'model': MODEL,
+                    'messages': [
+                        {
+                            'role': 'user',
+                            'content': prompt
+                        }
+                    ],
+                    'temperature': 0.3,
+                    'max_tokens': 200
+                }
+                
+                response = requests.post(url, headers=headers, json=payload, verify=False, timeout=15)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'choices' in result and len(result['choices']) > 0:
+                        content = result['choices'][0].get('message', {}).get('content', '').strip()
+                        
+                        # Извлекаем JSON из ответа
+                        json_match = re.search(r'\{[^}]+\}', content)
+                        if json_match:
+                            forecast_params = json.loads(json_match.group())
+                            
+                            category = forecast_params.get('category', '')
+                            change_percent = forecast_params.get('change_percent', -25)
+                            forecast_months = forecast_params.get('months', months)
+                            
+                            # Находим категорию в статистике
+                            matched_category = None
+                            for cat in category_monthly_avg.keys():
+                                if category.lower() in cat.lower() or cat.lower() in category.lower():
+                                    matched_category = cat
+                                    break
+                            
+                            if not matched_category and category_monthly_avg:
+                                # Используем первую категорию как fallback
+                                matched_category = list(category_monthly_avg.keys())[0]
+                            
+                            if matched_category:
+                                current_monthly = category_monthly_avg[matched_category]
+                                change_amount = current_monthly * (change_percent / 100)
+                                new_monthly = current_monthly + change_amount
+                                
+                                # Генерируем прогноз по месяцам
+                                monthly_forecast = []
+                                total_savings = 0
+                                
+                                for i in range(forecast_months):
+                                    month_date = datetime.now().replace(day=1) + timedelta(days=32 * (i + 1))
+                                    month_date = month_date.replace(day=1)
+                                    
+                                    savings = abs(change_amount) if change_amount < 0 else 0
+                                    total_savings += savings
+                                    
+                                    monthly_forecast.append({
+                                        "month": month_date.strftime("%Y-%m"),
+                                        "month_name": month_date.strftime("%B %Y"),
+                                        "current_amount": current_monthly,
+                                        "new_amount": new_monthly,
+                                        "savings": savings,
+                                        "change_percent": change_percent
+                                    })
+                                
+                                # Генерируем текстовое описание через GigaChat
+                                description_prompt = f"""Создай краткое описание финансового прогноза.
+
+Текущие средние месячные расходы на {matched_category}: {current_monthly:.0f}₽
+Изменение: {change_percent}%
+Новые средние месячные расходы: {new_monthly:.0f}₽
+Период прогноза: {forecast_months} месяца
+Общая экономия за период: {total_savings:.0f}₽
+
+Создай краткое описание (2-3 предложения) на русском языке, объясняющее прогноз и его влияние."""
+
+                                desc_payload = {
+                                    'model': MODEL,
+                                    'messages': [
+                                        {
+                                            'role': 'user',
+                                            'content': description_prompt
+                                        }
+                                    ],
+                                    'temperature': 0.7,
+                                    'max_tokens': 300
+                                }
+                                
+                                desc_response = requests.post(url, headers=headers, json=desc_payload, verify=False, timeout=15)
+                                description = ""
+                                
+                                if desc_response.status_code == 200:
+                                    desc_result = desc_response.json()
+                                    if 'choices' in desc_result and len(desc_result['choices']) > 0:
+                                        description = desc_result['choices'][0].get('message', {}).get('content', '').strip()
+                                
+                                return {
+                                    "category": matched_category,
+                                    "current_monthly": current_monthly,
+                                    "change_percent": change_percent,
+                                    "new_monthly": new_monthly,
+                                    "months": forecast_months,
+                                    "monthly_forecast": monthly_forecast,
+                                    "total_savings": total_savings,
+                                    "description": description,
+                                    "timestamp": datetime.now().isoformat()
+                                }
+        except Exception as e:
+            print(f"GigaChat forecast generation error: {str(e)}")
+    
+    # Fallback на простой прогноз
+    return _simple_forecast_generation(transactions, user_message, months)
+
+
+def _simple_forecast_generation(transactions: List[Dict], user_message: str, months: int = 3) -> Optional[Dict]:
+    """
+    Простая генерация прогноза без использования API (fallback)
+    """
+    expense_transactions = [t for t in transactions if t.get('type') == 'expense' or t.get('type') == 1]
+    
+    if len(expense_transactions) < 3:
+        return None
+    
+    # Простой парсинг запроса
+    message_lower = user_message.lower()
+    
+    # Ищем категорию
+    categories = ['развлечения', 'entertainment', 'еда', 'food', 'транспорт', 'transport', 
+                  'покупки', 'shopping', 'здоровье', 'health']
+    matched_category = None
+    for cat in categories:
+        if cat in message_lower:
+            matched_category = cat
+            break
+    
+    # Ищем процент изменения
+    percent_match = re.search(r'(\d+)%', user_message)
+    change_percent = -25  # По умолчанию уменьшение на 25%
+    if percent_match:
+        change_percent = -int(percent_match.group(1))
+    
+    # Группируем по категориям
+    category_stats = {}
+    for t in expense_transactions:
+        category = t.get('category', 'Other')
+        amount = float(t.get('amount', 0))
+        
+        if category not in category_stats:
+            category_stats[category] = {'total': 0, 'count': 0}
+        
+        category_stats[category]['total'] += amount
+        category_stats[category]['count'] += 1
+    
+    # Находим категорию
+    if not matched_category:
+        matched_category = list(category_stats.keys())[0] if category_stats else 'Other'
+    
+    current_monthly = category_stats.get(matched_category, {}).get('total', 0) / max(1, category_stats.get(matched_category, {}).get('count', 1))
+    change_amount = current_monthly * (change_percent / 100)
+    new_monthly = current_monthly + change_amount
+    
+    # Генерируем прогноз
+    monthly_forecast = []
+    total_savings = 0
+    
+    for i in range(months):
+        month_date = datetime.now().replace(day=1) + timedelta(days=32 * (i + 1))
+        month_date = month_date.replace(day=1)
+        
+        savings = abs(change_amount) if change_amount < 0 else 0
+        total_savings += savings
+        
+        monthly_forecast.append({
+            "month": month_date.strftime("%Y-%m"),
+            "month_name": month_date.strftime("%B %Y"),
+            "current_amount": current_monthly,
+            "new_amount": new_monthly,
+            "savings": savings,
+            "change_percent": change_percent
+        })
+    
+    return {
+        "category": matched_category,
+        "current_monthly": current_monthly,
+        "change_percent": change_percent,
+        "new_monthly": new_monthly,
+        "months": months,
+        "monthly_forecast": monthly_forecast,
+        "total_savings": total_savings,
+        "description": f"При уменьшении расходов на {matched_category} на {abs(change_percent)}%, вы сэкономите {total_savings:.0f}₽ за {months} месяца.",
+        "timestamp": datetime.now().isoformat()
+    }
 
 
 def _simple_financial_advice(portfolio_data: Dict, analysis_type: str = "full") -> List[str]:

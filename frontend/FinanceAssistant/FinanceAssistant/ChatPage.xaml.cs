@@ -201,6 +201,23 @@ namespace FinanceAssistant
             return hasTransactionKeyword || hasAmount;
         }
 
+        private bool IsForecastMessage(string message)
+        {
+            var messageLower = message.ToLower();
+            
+            var forecastKeywords = new[]
+            {
+                "что будет если", "что будет, если",
+                "прогноз", "симуляция", "симулировать",
+                "уменьшу", "увеличу", "сокращу", "снижу",
+                "сколько сэкономлю", "сколько сэкономлю",
+                "покажи прогноз", "рассчитай", "посчитай",
+                "если я", "если уменьшить", "если увеличить"
+            };
+            
+            return forecastKeywords.Any(k => messageLower.Contains(k));
+        }
+
         private async void OnSendMessage(object? sender, EventArgs e)
         {
             var message = MessageEntry.Text?.Trim();
@@ -776,6 +793,69 @@ namespace FinanceAssistant
                             "'Потратил 500 рублей на еду'"
                         );
                         MessagesContainer.Children.Add(noTransactionsView);
+                        ScrollToBottom();
+                    }
+                }
+                else if (IsForecastMessage(message))
+                {
+                    // Handle as forecast request
+                    var allTransactions = await _databaseService.GetTransactionsAsync();
+                    var transactionsData = allTransactions.Select(t => new Dictionary<string, object>
+                    {
+                        { "title", t.Title },
+                        { "amount", (double)t.Amount },
+                        { "category", t.Category?.Name ?? "Other" },
+                        { "date", t.Date.ToString("yyyy-MM-dd") },
+                        { "importance", t.Importance.ToString().ToLower() },
+                        { "type", t.Type == TransactionType.Expense ? "expense" : "income" }
+                    }).ToList();
+
+                    var forecastResult = await _financeService.GetForecastAsync(transactionsData, message);
+                    MessagesContainer.Children.Remove(loadingView);
+
+                    if (forecastResult != null && forecastResult.MonthlyForecast != null && forecastResult.MonthlyForecast.Count > 0)
+                    {
+                        var forecastText = new System.Text.StringBuilder();
+                        
+                        if (!string.IsNullOrEmpty(forecastResult.Description))
+                        {
+                            forecastText.AppendLine(forecastResult.Description);
+                            forecastText.AppendLine();
+                        }
+                        
+                        forecastText.AppendLine($"Прогноз на {forecastResult.Months} месяца:");
+                        forecastText.AppendLine();
+                        
+                        foreach (var month in forecastResult.MonthlyForecast)
+                        {
+                            var monthName = month.ContainsKey("month_name") ? month["month_name"].ToString() : month["month"].ToString();
+                            var currentAmount = month.ContainsKey("current_amount") ? Convert.ToDouble(month["current_amount"]) : 0;
+                            var newAmount = month.ContainsKey("new_amount") ? Convert.ToDouble(month["new_amount"]) : 0;
+                            var savings = month.ContainsKey("savings") ? Convert.ToDouble(month["savings"]) : 0;
+                            
+                            forecastText.AppendLine($"{monthName}:");
+                            forecastText.AppendLine($"  Было: {FormatCurrency((decimal)currentAmount)}");
+                            forecastText.AppendLine($"  Станет: {FormatCurrency((decimal)newAmount)}");
+                            if (savings > 0)
+                            {
+                                forecastText.AppendLine($"  Экономия: {FormatCurrency((decimal)savings)}");
+                            }
+                            forecastText.AppendLine();
+                        }
+                        
+                        if (forecastResult.TotalSavings.HasValue && forecastResult.TotalSavings.Value > 0)
+                        {
+                            forecastText.AppendLine($"Общая экономия за период: {FormatCurrency((decimal)forecastResult.TotalSavings.Value)}");
+                        }
+                        
+                        var forecastView = CreateBotMessageView(forecastText.ToString());
+                        MessagesContainer.Children.Add(forecastView);
+                        ScrollToBottom();
+                    }
+                    else
+                    {
+                        var errorView = CreateBotMessageView("Не удалось сгенерировать прогноз. Попробуйте переформулировать вопрос, например: 'Что будет, если я уменьшу траты на развлечения на 25%?'");
+                        MessagesContainer.Children.Add(errorView);
                         ScrollToBottom();
                     }
                 }
