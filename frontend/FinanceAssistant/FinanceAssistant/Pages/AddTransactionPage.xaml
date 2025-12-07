@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="FinanceAssistant.Pages.AddTransactionPage"
+             BackgroundColor="{StaticResource BackgroundDark}"
+             NavigationPage.HasNavigationBar="False"
+             Shell.NavBarIsVisible="False">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        
+        <!-- Header -->
+        <Grid Grid.Row="0" Padding="20,50,20,20" ColumnDefinitions="Auto,*,Auto">
+            <Border BackgroundColor="{StaticResource BackgroundElevated}"
+                    StrokeShape="RoundRectangle 20"
+                    Stroke="Transparent"
+                    HeightRequest="40"
+                    WidthRequest="40">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnBackTapped"/>
+                </Border.GestureRecognizers>
+                <Label Text="&lt;"
+                       TextColor="{StaticResource TextPrimary}"
+                       FontSize="20"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center"/>
+            </Border>
+            
+            <Label Grid.Column="1"
+                   Text="Add Transaction"
+                   TextColor="{StaticResource TextPrimary}"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center"/>
+        </Grid>
+
+        <!-- Content -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="20" Padding="20,10">
+                
+                <!-- Transaction Type Toggle -->
+                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                        StrokeShape="RoundRectangle 15"
+                        Stroke="Transparent"
+                        Padding="5">
+                    <Grid ColumnDefinitions="*,*">
+                        <Border x:Name="ExpenseTab"
+                                BackgroundColor="{StaticResource AccentRed}"
+                                StrokeShape="RoundRectangle 12"
+                                Stroke="Transparent"
+                                Padding="15,12">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnExpenseTabTapped"/>
+                            </Border.GestureRecognizers>
+                            <Label Text="Expense"
+                                   TextColor="{StaticResource TextPrimary}"
+                                   FontSize="16"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"/>
+                        </Border>
+                        
+                        <Border x:Name="IncomeTab"
+                                Grid.Column="1"
+                                BackgroundColor="Transparent"
+                                StrokeShape="RoundRectangle 12"
+                                Stroke="Transparent"
+                                Padding="15,12">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnIncomeTabTapped"/>
+                            </Border.GestureRecognizers>
+                            <Label x:Name="IncomeTabLabel"
+                                   Text="Income"
+                                   TextColor="{StaticResource TextSecondary}"
+                                   FontSize="16"
+                                   HorizontalOptions="Center"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- Amount Input -->
+                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                        StrokeShape="RoundRectangle 20"
+                        Stroke="Transparent"
+                        Padding="20">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Amount"
+                               TextColor="{StaticResource TextSecondary}"
+                               FontSize="14"/>
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <Label x:Name="CurrencySymbol"
+                                   Text="RUB"
+                                   TextColor="{StaticResource TextSecondary}"
+                                   FontSize="24"
+                                   VerticalOptions="Center"/>
+                            <Entry x:Name="AmountEntry"
+                                   Grid.Column="1"
+                                   Placeholder="0"
+                                   PlaceholderColor="{StaticResource TextMuted}"
+                                   TextColor="{StaticResource TextPrimary}"
+                                   FontSize="36"
+                                   FontAttributes="Bold"
+                                   Keyboard="Numeric"
+                                   BackgroundColor="Transparent"
+                                   HorizontalOptions="Fill"
+                                   Margin="10,0"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Title Input -->
+                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                        StrokeShape="RoundRectangle 20"
+                        Stroke="Transparent"
+                        Padding="20">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Title (optional)"
+                               TextColor="{StaticResource TextSecondary}"
+                               FontSize="14"/>
+                        <Entry x:Name="TitleEntry"
+                               Placeholder="Enter description..."
+                               PlaceholderColor="{StaticResource TextMuted}"
+                               TextColor="{StaticResource TextPrimary}"
+                               FontSize="16"
+                               BackgroundColor="Transparent"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Category Selection -->
+                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                        StrokeShape="RoundRectangle 20"
+                        Stroke="Transparent"
+                        Padding="20">
+                    <VerticalStackLayout Spacing="15">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="Category"
+                                   TextColor="{StaticResource TextSecondary}"
+                                   FontSize="14"/>
+                            <Label Grid.Column="1"
+                                   Text="+ Add New"
+                                   TextColor="{StaticResource Primary}"
+                                   FontSize="14">
+                                <Label.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnAddCategoryTapped"/>
+                                </Label.GestureRecognizers>
+                            </Label>
+                        </Grid>
+                        
+                        <FlexLayout x:Name="CategoriesContainer"
+                                    Wrap="Wrap"
+                                    JustifyContent="Start"
+                                    AlignItems="Start">
+                            <!-- Categories will be added dynamically -->
+                        </FlexLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Importance Selection -->
+                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                        StrokeShape="RoundRectangle 20"
+                        Stroke="Transparent"
+                        Padding="20">
+                    <VerticalStackLayout Spacing="15">
+                        <Label Text="Importance"
+                               TextColor="{StaticResource TextSecondary}"
+                               FontSize="14"/>
+                        
+                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="10">
+                            <Border x:Name="ImportanceLow"
+                                    BackgroundColor="{StaticResource BackgroundElevated}"
+                                    StrokeShape="RoundRectangle 12"
+                                    Stroke="Transparent"
+                                    Padding="10,15">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnImportanceTapped" CommandParameter="0"/>
+                                </Border.GestureRecognizers>
+                                <VerticalStackLayout Spacing="5">
+                                    <Label Text="Low"
+                                           TextColor="{StaticResource TextSecondary}"
+                                           FontSize="12"
+                                           HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            
+                            <Border x:Name="ImportanceMedium"
+                                    Grid.Column="1"
+                                    BackgroundColor="{StaticResource Primary}"
+                                    StrokeShape="RoundRectangle 12"
+                                    Stroke="Transparent"
+                                    Padding="10,15">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnImportanceTapped" CommandParameter="1"/>
+                                </Border.GestureRecognizers>
+                                <VerticalStackLayout Spacing="5">
+                                    <Label Text="Medium"
+                                           TextColor="{StaticResource BackgroundDark}"
+                                           FontSize="12"
+                                           FontAttributes="Bold"
+                                           HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            
+                            <Border x:Name="ImportanceHigh"
+                                    Grid.Column="2"
+                                    BackgroundColor="{StaticResource BackgroundElevated}"
+                                    StrokeShape="RoundRectangle 12"
+                                    Stroke="Transparent"
+                                    Padding="10,15">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnImportanceTapped" CommandParameter="2"/>
+                                </Border.GestureRecognizers>
+                                <VerticalStackLayout Spacing="5">
+                                    <Label Text="High"
+                                           TextColor="{StaticResource TextSecondary}"
+                                           FontSize="12"
+                                           HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            
+                            <Border x:Name="ImportanceCritical"
+                                    Grid.Column="3"
+                                    BackgroundColor="{StaticResource BackgroundElevated}"
+                                    StrokeShape="RoundRectangle 12"
+                                    Stroke="Transparent"
+                                    Padding="10,15">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnImportanceTapped" CommandParameter="3"/>
+                                </Border.GestureRecognizers>
+                                <VerticalStackLayout Spacing="5">
+                                    <Label Text="Critical"
+                                           TextColor="{StaticResource TextSecondary}"
+                                           FontSize="12"
+                                           HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                            </Border>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Bottom spacing -->
+                <BoxView HeightRequest="20" Color="Transparent"/>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Save Button -->
+        <Border Grid.Row="2"
+                BackgroundColor="{StaticResource Primary}"
+                StrokeShape="RoundRectangle 20"
+                Stroke="Transparent"
+                Margin="20,10,20,30"
+                Padding="20,18">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource Primary}"
+                        Offset="0,4"
+                        Radius="15"
+                        Opacity="0.4"/>
+            </Border.Shadow>
+            <Border.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnSaveTapped"/>
+            </Border.GestureRecognizers>
+            <Label Text="Save Transaction"
+                   TextColor="{StaticResource BackgroundDark}"
+                   FontSize="18"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"/>
+        </Border>
+    </Grid>
+</ContentPage>
+

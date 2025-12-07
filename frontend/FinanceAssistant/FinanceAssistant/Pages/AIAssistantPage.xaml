@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="FinanceAssistant.Pages.AIAssistantPage"
+             BackgroundColor="{StaticResource BackgroundDark}"
+             Shell.NavBarIsVisible="False">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        
+        <!-- Header -->
+        <Grid Grid.Row="0" Padding="20,50,20,20" ColumnDefinitions="Auto,*">
+            <Border BackgroundColor="{StaticResource BackgroundElevated}"
+                    StrokeShape="RoundRectangle 20"
+                    Stroke="Transparent"
+                    HeightRequest="40"
+                    WidthRequest="40">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnBackTapped"/>
+                </Border.GestureRecognizers>
+                <Label Text="&lt;"
+                       TextColor="{StaticResource TextPrimary}"
+                       FontSize="20"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center"/>
+            </Border>
+            
+            <Label Grid.Column="1"
+                   Text="AI Assistant"
+                   TextColor="{StaticResource TextPrimary}"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center"
+                   Margin="-40,0,0,0">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnHeaderTapped"/>
+                </Label.GestureRecognizers>
+            </Label>
+        </Grid>
+
+        <!-- Chat Messages -->
+        <ScrollView Grid.Row="1" x:Name="ChatScrollView">
+            <VerticalStackLayout x:Name="MessagesContainer" Spacing="15" Padding="20,10">
+                
+                <!-- AI Welcome Message -->
+                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                        StrokeShape="RoundRectangle 15,15,15,0"
+                        Stroke="Transparent"
+                        Padding="15"
+                        HorizontalOptions="Start"
+                        MaximumWidthRequest="300">
+                    <VerticalStackLayout Spacing="5">
+                        <Label Text="AI Assistant"
+                               TextColor="{StaticResource Primary}"
+                               FontSize="12"
+                               FontAttributes="Bold"/>
+                        <Label Text="Hello! I'm your personal finance assistant. I can help you analyze your spending, give advice on budgeting, and answer questions about your finances. How can I help you today?"
+                               TextColor="{StaticResource TextPrimary}"
+                               FontSize="14"
+                               LineBreakMode="WordWrap"/>
+                    </VerticalStackLayout>
+                </Border>
+                
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Input Area -->
+        <Border Grid.Row="2"
+                BackgroundColor="{StaticResource BackgroundCard}"
+                Padding="15,15,15,30">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                <Border BackgroundColor="{StaticResource BackgroundElevated}"
+                        StrokeShape="RoundRectangle 25"
+                        Stroke="Transparent"
+                        Padding="15,10">
+                    <Entry x:Name="MessageEntry"
+                           Placeholder="Type a message..."
+                           PlaceholderColor="{StaticResource TextMuted}"
+                           TextColor="{StaticResource TextPrimary}"
+                           FontSize="16"
+                           BackgroundColor="Transparent"
+                           ReturnType="Send"
+                           Completed="OnSendMessage"/>
+                </Border>
+                
+                <Border Grid.Column="1"
+                        BackgroundColor="{StaticResource Primary}"
+                        StrokeShape="RoundRectangle 25"
+                        Stroke="Transparent"
+                        HeightRequest="50"
+                        WidthRequest="50">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSendTapped"/>
+                    </Border.GestureRecognizers>
+                    <Label Text=">"
+                           TextColor="{StaticResource BackgroundDark}"
+                           FontSize="20"
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"/>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</ContentPage>
+

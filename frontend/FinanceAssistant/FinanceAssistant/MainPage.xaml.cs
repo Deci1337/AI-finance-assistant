@@ -1,19 +1,19 @@
 ﻿using FinanceAssistant.Controls;
+using FinanceAssistant.Data;
 using FinanceAssistant.Models;
-using FinanceAssistant.Services;
 using Microsoft.Maui.Controls.Shapes;
 
 namespace FinanceAssistant
 {
     public partial class MainPage : ContentPage
     {
-        private readonly FinanceService _financeService;
+        private readonly DatabaseService _databaseService;
         private readonly FinanceChartDrawable _chartDrawable;
 
-        public MainPage()
+        public MainPage(DatabaseService databaseService)
         {
             InitializeComponent();
-            _financeService = new FinanceService();
+            _databaseService = databaseService;
             _chartDrawable = new FinanceChartDrawable();
             ChartView.Drawable = _chartDrawable;
         }
@@ -26,15 +26,17 @@ namespace FinanceAssistant
 
         private async Task LoadDataAsync()
         {
-            var profile = await _financeService.GetUserProfileAsync();
-            var transactions = await _financeService.GetRecentTransactionsAsync(5);
-            var chartData = await _financeService.GetChartDataAsync(7);
+            var profile = await _databaseService.GetUserProfileAsync();
+            var transactions = await _databaseService.GetRecentTransactionsAsync(5);
+            var chartData = await _databaseService.GetChartDataAsync(7);
+            var balance = await _databaseService.GetTotalBalanceAsync();
+            var (monthlyIncome, monthlyExpense) = await _databaseService.GetMonthlyTotalsAsync();
 
             // Update profile
             UserNameLabel.Text = profile.Name;
-            BalanceLabel.Text = FormatCurrency(profile.TotalBalance);
-            IncomeLabel.Text = $"+{FormatCurrency(profile.MonthlyIncome)}";
-            ExpenseLabel.Text = $"-{FormatCurrency(profile.MonthlyExpense)}";
+            BalanceLabel.Text = FormatCurrency(balance);
+            IncomeLabel.Text = $"+{FormatCurrency(monthlyIncome)}";
+            ExpenseLabel.Text = $"-{FormatCurrency(monthlyExpense)}";
 
             // Update chart
             _chartDrawable.DataPoints = chartData;
@@ -48,6 +50,20 @@ namespace FinanceAssistant
         {
             TransactionsContainer.Children.Clear();
 
+            if (transactions.Count == 0)
+            {
+                var emptyLabel = new Label
+                {
+                    Text = "No transactions yet. Tap + to add one!",
+                    TextColor = Color.FromArgb("#8B949E"),
+                    FontSize = 14,
+                    HorizontalOptions = LayoutOptions.Center,
+                    Margin = new Thickness(0, 20)
+                };
+                TransactionsContainer.Children.Add(emptyLabel);
+                return;
+            }
+
             foreach (var transaction in transactions)
             {
                 var transactionView = CreateTransactionView(transaction);
@@ -60,7 +76,8 @@ namespace FinanceAssistant
             var isIncome = transaction.Type == TransactionType.Income;
             var amountColor = isIncome ? Color.FromArgb("#00D09E") : Color.FromArgb("#FF6B6B");
             var amountPrefix = isIncome ? "+" : "-";
-            var iconText = GetCategoryIcon(transaction.Category);
+            var iconText = transaction.Category?.Icon ?? GetCategoryIcon(transaction.Title);
+            var categoryColor = transaction.Category?.ColorHex ?? "#8B949E";
 
             var border = new Border
             {
@@ -83,7 +100,7 @@ namespace FinanceAssistant
             // Category icon
             var iconBorder = new Border
             {
-                BackgroundColor = Color.FromArgb("#21262D"),
+                BackgroundColor = Color.FromArgb(categoryColor).WithAlpha(0.2f),
                 StrokeShape = new RoundRectangle { CornerRadius = 12 },
                 Stroke = Brush.Transparent,
                 HeightRequest = 44,
@@ -94,8 +111,9 @@ namespace FinanceAssistant
             var iconLabel = new Label
             {
                 Text = iconText,
-                TextColor = Color.FromArgb("#8B949E"),
-                FontSize = 18,
+                TextColor = Color.FromArgb(categoryColor),
+                FontSize = 16,
+                FontAttributes = FontAttributes.Bold,
                 HorizontalOptions = LayoutOptions.Center,
                 VerticalOptions = LayoutOptions.Center
             };
@@ -116,9 +134,11 @@ namespace FinanceAssistant
                 FontAttributes = FontAttributes.Bold
             };
 
+            var categoryName = transaction.Category?.Name ?? "Other";
+            var importanceText = GetImportanceText(transaction.Importance);
             var categoryLabel = new Label
             {
-                Text = $"{transaction.Category} - {transaction.Date:dd MMM}",
+                Text = $"{categoryName} - {importanceText} - {transaction.Date:dd MMM}",
                 TextColor = Color.FromArgb("#8B949E"),
                 FontSize = 12
             };
@@ -148,18 +168,21 @@ namespace FinanceAssistant
             return border;
         }
 
-        private static string GetCategoryIcon(string category)
+        private static string GetImportanceText(ImportanceLevel importance)
         {
-            return category.ToLower() switch
+            return importance switch
             {
-                "food" => "F",
-                "transport" => "T",
-                "entertainment" => "E",
-                "health" => "H",
-                "work" => "W",
-                "shopping" => "S",
-                _ => "O"
+                ImportanceLevel.Low => "Low",
+                ImportanceLevel.Medium => "Med",
+                ImportanceLevel.High => "High",
+                ImportanceLevel.Critical => "Crit",
+                _ => "Med"
             };
+        }
+
+        private static string GetCategoryIcon(string title)
+        {
+            return title.Length > 0 ? title[0].ToString().ToUpper() : "O";
         }
 
         private static string FormatCurrency(decimal amount)
@@ -169,50 +192,23 @@ namespace FinanceAssistant
 
         private async void OnProfileTapped(object? sender, EventArgs e)
         {
-            await DisplayAlert("Профиль", "Настройки профиля будут доступны в ближайшее время", "ОК");
+            await Shell.Current.GoToAsync("ProfilePage");
         }
 
         private async void OnChatTapped(object? sender, EventArgs e)
         {
-            var chatPage = new ChatPage();
-            await Navigation.PushAsync(chatPage);
+            // Navigate to ChatPage (new AI extraction chat)
+            await Shell.Current.GoToAsync("ChatPage");
         }
 
         private async void OnAddTransactionTapped(object? sender, EventArgs e)
         {
-            string action = await DisplayActionSheet("Добавить транзакцию", "Отмена", null, "Доход", "Расход");
-            
-            if (action == "Отмена" || string.IsNullOrEmpty(action))
-                return;
-
-            string? title = await DisplayPromptAsync("Транзакция", "Введите название:", "ОК", "Отмена");
-            if (string.IsNullOrEmpty(title))
-                return;
-
-            string? amountStr = await DisplayPromptAsync("Сумма", "Введите сумму:", "ОК", "Отмена", keyboard: Keyboard.Numeric);
-            if (string.IsNullOrEmpty(amountStr) || !decimal.TryParse(amountStr, out decimal amount))
-                return;
-
-            string? category = await DisplayPromptAsync("Категория", "Введите категорию:", "ОК", "Отмена", initialValue: "Другое");
-            
-            var transaction = new Transaction
-            {
-                Title = title,
-                Amount = amount,
-                Type = action == "Доход" ? TransactionType.Income : TransactionType.Expense,
-                Category = category ?? "Другое"
-            };
-
-            await _financeService.AddTransactionAsync(transaction);
-            await LoadDataAsync();
-
-            string actionText = action == "Доход" ? "Доход" : "Расход";
-            await DisplayAlert("Успешно", $"{actionText} добавлен успешно!", "ОК");
+            await Shell.Current.GoToAsync("AddTransactionPage");
         }
 
         private async void OnStatsTapped(object? sender, EventArgs e)
         {
-            await DisplayAlert("Статистика", "Детальная статистика будет доступна в ближайшее время", "ОК");
+            await Shell.Current.GoToAsync("StatisticsPage");
         }
 
         private async void OnSeeAllTapped(object? sender, EventArgs e)

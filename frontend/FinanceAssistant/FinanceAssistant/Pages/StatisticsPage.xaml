@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="FinanceAssistant.Pages.StatisticsPage"
+             BackgroundColor="{StaticResource BackgroundDark}"
+             Shell.NavBarIsVisible="False">
+
+    <Grid RowDefinitions="Auto,*">
+        
+        <!-- Header -->
+        <Grid Grid.Row="0" Padding="20,50,20,20" ColumnDefinitions="Auto,*">
+            <Border BackgroundColor="{StaticResource BackgroundElevated}"
+                    StrokeShape="RoundRectangle 20"
+                    Stroke="Transparent"
+                    HeightRequest="40"
+                    WidthRequest="40">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnBackTapped"/>
+                </Border.GestureRecognizers>
+                <Label Text="&lt;"
+                       TextColor="{StaticResource TextPrimary}"
+                       FontSize="20"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center"/>
+            </Border>
+            
+            <Label Grid.Column="1"
+                   Text="Statistics"
+                   TextColor="{StaticResource TextPrimary}"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center"
+                   Margin="-40,0,0,0"/>
+        </Grid>
+
+        <!-- Content -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="20" Padding="20,10">
+                
+                <!-- Period Selector -->
+                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                        StrokeShape="RoundRectangle 15"
+                        Stroke="Transparent"
+                        Padding="5">
+                    <Grid ColumnDefinitions="*,*,*,*">
+                        <Border x:Name="Period1Day"
+                                BackgroundColor="Transparent"
+                                StrokeShape="RoundRectangle 12"
+                                Stroke="Transparent"
+                                Padding="12,10">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnPeriodTapped" CommandParameter="1"/>
+                            </Border.GestureRecognizers>
+                            <Label Text="1D"
+                                   TextColor="{StaticResource TextSecondary}"
+                                   FontSize="14"
+                                   HorizontalOptions="Center"/>
+                        </Border>
+                        
+                        <Border x:Name="Period7Days"
+                                Grid.Column="1"
+                                BackgroundColor="{StaticResource Primary}"
+                                StrokeShape="RoundRectangle 12"
+                                Stroke="Transparent"
+                                Padding="12,10">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnPeriodTapped" CommandParameter="7"/>
+                            </Border.GestureRecognizers>
+                            <Label x:Name="Period7DaysLabel"
+                                   Text="7D"
+                                   TextColor="{StaticResource BackgroundDark}"
+                                   FontSize="14"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"/>
+                        </Border>
+                        
+                        <Border x:Name="Period30Days"
+                                Grid.Column="2"
+                                BackgroundColor="Transparent"
+                                StrokeShape="RoundRectangle 12"
+                                Stroke="Transparent"
+                                Padding="12,10">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnPeriodTapped" CommandParameter="30"/>
+                            </Border.GestureRecognizers>
+                            <Label Text="30D"
+                                   TextColor="{StaticResource TextSecondary}"
+                                   FontSize="14"
+                                   HorizontalOptions="Center"/>
+                        </Border>
+                        
+                        <Border x:Name="Period365Days"
+                                Grid.Column="3"
+                                BackgroundColor="Transparent"
+                                StrokeShape="RoundRectangle 12"
+                                Stroke="Transparent"
+                                Padding="12,10">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnPeriodTapped" CommandParameter="365"/>
+                            </Border.GestureRecognizers>
+                            <Label Text="1Y"
+                                   TextColor="{StaticResource TextSecondary}"
+                                   FontSize="14"
+                                   HorizontalOptions="Center"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- Summary Cards -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="15">
+                    <Border BackgroundColor="{StaticResource BackgroundCard}"
+                            StrokeShape="RoundRectangle 20"
+                            Stroke="Transparent"
+                            Padding="15">
+                        <VerticalStackLayout Spacing="5">
+                            <Label Text="Income"
+                                   TextColor="{StaticResource TextSecondary}"
+                                   FontSize="12"/>
+                            <Label x:Name="PeriodIncomeLabel"
+                                   Text="0 RUB"
+                                   TextColor="{StaticResource AccentGreen}"
+                                   FontSize="20"
+                                   FontAttributes="Bold"/>
+                        </VerticalStackLayout>
+                    </Border>
+                    
+                    <Border Grid.Column="1"
+                            BackgroundColor="{StaticResource BackgroundCard}"
+                            StrokeShape="RoundRectangle 20"
+                            Stroke="Transparent"
+                            Padding="15">
+                        <VerticalStackLayout Spacing="5">
+                            <Label Text="Expense"
+                                   TextColor="{StaticResource TextSecondary}"
+                                   FontSize="12"/>
+                            <Label x:Name="PeriodExpenseLabel"
+                                   Text="0 RUB"
+                                   TextColor="{StaticResource AccentRed}"
+                                   FontSize="20"
+                                   FontAttributes="Bold"/>
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+
+                <!-- Bar Chart -->
+                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                        StrokeShape="RoundRectangle 20"
+                        Stroke="Transparent"
+                        Padding="15">
+                    <VerticalStackLayout Spacing="15">
+                        <Label Text="Income vs Expense"
+                               TextColor="{StaticResource TextPrimary}"
+                               FontSize="18"
+                               FontAttributes="Bold"/>
+                        
+                        <!-- Legend -->
+                        <HorizontalStackLayout Spacing="20">
+                            <HorizontalStackLayout Spacing="8">
+                                <BoxView Color="{StaticResource AccentGreen}"
+                                         WidthRequest="12"
+                                         HeightRequest="12"
+                                         CornerRadius="3"/>
+                                <Label Text="Income"
+                                       TextColor="{StaticResource TextSecondary}"
+                                       FontSize="12"/>
+                            </HorizontalStackLayout>
+                            <HorizontalStackLayout Spacing="8">
+                                <BoxView Color="{StaticResource AccentRed}"
+                                         WidthRequest="12"
+                                         HeightRequest="12"
+                                         CornerRadius="3"/>
+                                <Label Text="Expense"
+                                       TextColor="{StaticResource TextSecondary}"
+                                       FontSize="12"/>
+                            </HorizontalStackLayout>
+                        </HorizontalStackLayout>
+                        
+                        <GraphicsView x:Name="BarChartView"
+                                      HeightRequest="200"
+                                      BackgroundColor="Transparent"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Pie Chart - Expenses by Category -->
+                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                        StrokeShape="RoundRectangle 20"
+                        Stroke="Transparent"
+                        Padding="15">
+                    <VerticalStackLayout Spacing="15">
+                        <Label Text="Expenses by Category"
+                               TextColor="{StaticResource TextPrimary}"
+                               FontSize="18"
+                               FontAttributes="Bold"/>
+                        
+                        <GraphicsView x:Name="PieChartView"
+                                      HeightRequest="200"
+                                      BackgroundColor="Transparent"/>
+                        
+                        <!-- Category Legend -->
+                        <VerticalStackLayout x:Name="CategoryLegend" Spacing="10">
+                            <!-- Categories will be added dynamically -->
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Top Expenses -->
+                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                        StrokeShape="RoundRectangle 20"
+                        Stroke="Transparent"
+                        Padding="15">
+                    <VerticalStackLayout Spacing="15">
+                        <Label Text="Top Expenses"
+                               TextColor="{StaticResource TextPrimary}"
+                               FontSize="18"
+                               FontAttributes="Bold"/>
+                        
+                        <VerticalStackLayout x:Name="TopExpensesList" Spacing="10">
+                            <!-- Top expenses will be added dynamically -->
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <BoxView HeightRequest="30" Color="Transparent"/>
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>
+

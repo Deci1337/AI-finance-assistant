@@ -1,37 +1,42 @@
+using SQLite;
+
 namespace FinanceAssistant.Models
 {
     public enum TransactionType
     {
-        Income,
-        Expense
+        Income = 0,
+        Expense = 1
     }
 
+    public enum ImportanceLevel
+    {
+        Low = 0,
+        Medium = 1,
+        High = 2,
+        Critical = 3
+    }
+
+    [Table("Transactions")]
     public class Transaction
     {
+        [PrimaryKey, AutoIncrement]
         public int Id { get; set; }
+        
         public string Title { get; set; } = string.Empty;
+        
         public decimal Amount { get; set; }
+        
         public TransactionType Type { get; set; }
-        public string Category { get; set; } = string.Empty;
-        public DateTime Date { get; set; }
+        
+        public int CategoryId { get; set; }
+        
+        public ImportanceLevel Importance { get; set; } = ImportanceLevel.Medium;
+        
+        public DateTime Date { get; set; } = DateTime.Now;
+        
         public string? Description { get; set; }
-    }
 
-    public class ChartDataPoint
-    {
-        public DateTime Date { get; set; }
-        public decimal Income { get; set; }
-        public decimal Expense { get; set; }
-        public decimal Balance => Income - Expense;
-    }
-
-    public class UserProfile
-    {
-        public string Name { get; set; } = "User";
-        public string AvatarUrl { get; set; } = string.Empty;
-        public decimal TotalBalance { get; set; }
-        public decimal MonthlyIncome { get; set; }
-        public decimal MonthlyExpense { get; set; }
+        [Ignore]
+        public Category? Category { get; set; }
     }
 }
-

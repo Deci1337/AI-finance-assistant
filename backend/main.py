@@ -12,7 +12,14 @@ import os
 from typing import Dict, List, Optional
 from datetime import datetime
 from mock_data import get_mock_portfolio, calculate_portfolio_metrics
-from gigachat_integration import analyze_emotions_with_fallback, generate_financial_advice_with_fallback, generate_comprehensive_advice_with_fallback, extract_transactions_with_fallback
+from gigachat_integration import (
+    analyze_emotions_with_fallback, 
+    generate_financial_advice_with_fallback, 
+    generate_comprehensive_advice_with_fallback, 
+    extract_transactions_with_fallback,
+    get_access_token,
+    chat_completion
+)
 
 # Создание экземпляра FastAPI приложения
 app = FastAPI(
@@ -147,6 +154,30 @@ class TransactionExtractionResponse(BaseModel):
     questions: Optional[List[str]] = None  # Вопросы для уточнения
     warnings: Optional[List[str]] = None  # Предупреждения
     extracted_parameters: Optional[Dict] = None  # Извлеченные параметры
+
+
+class ChatRequest(BaseModel):
+    """Модель запроса для чата с ИИ"""
+    message: str
+    context: Optional[str] = None  # Контекст (история расходов, баланс и т.д.)
+
+
+class ChatResponse(BaseModel):
+    """Модель ответа от ИИ"""
+    response: str
+    timestamp: str
+
+
+# Хранение токена GigaChat (кэширование)
+_gigachat_token: Optional[str] = None
+
+
+def get_gigachat_token() -> Optional[str]:
+    """Получить или обновить токен GigaChat"""
+    global _gigachat_token
+    if _gigachat_token is None:
+        _gigachat_token = get_access_token()
+    return _gigachat_token
 
 
 # Базовые роуты
@@ -370,6 +401,59 @@ async def extract_transactions(request: TransactionExtractionRequest) -> Transac
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при извлечении транзакций: {str(e)}")
+
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat_with_ai(request: ChatRequest) -> ChatResponse:
+    """
+    Чат с ИИ-ассистентом (GigaChat)
+    
+    Отправляет сообщение пользователя в GigaChat и возвращает ответ.
+    Контекст может включать информацию о финансах пользователя.
+    """
+    try:
+        token = get_gigachat_token()
+        if not token:
+            # Если токен не получен, возвращаем заглушку
+            return ChatResponse(
+                response="Извините, сервис временно недоступен. Попробуйте позже.",
+                timestamp=datetime.now().isoformat()
+            )
+        
+        # Формируем системный промпт для финансового ассистента
+        system_context = """Ты - персональный финансовый ассистент. Твоя задача:
+- Помогать пользователю управлять финансами
+- Давать советы по бюджетированию и экономии
+- Анализировать расходы и доходы
+- Отвечать на вопросы о финансах
+Отвечай кратко, по делу, на русском языке."""
+        
+        # Добавляем контекст пользователя если есть
+        full_message = request.message
+        if request.context:
+            full_message = f"Контекст финансов пользователя: {request.context}\n\nВопрос: {request.message}"
+        
+        # Отправляем запрос в GigaChat
+        result = chat_completion(token, f"{system_context}\n\n{full_message}")
+        
+        if 'error' in result:
+            # Сбрасываем токен при ошибке авторизации
+            global _gigachat_token
+            _gigachat_token = None
+            return ChatResponse(
+                response="Произошла ошибка при обработке запроса. Попробуйте ещё раз.",
+                timestamp=datetime.now().isoformat()
+            )
+        
+        # Извлекаем ответ из результата
+        ai_response = result.get('choices', [{}])[0].get('message', {}).get('content', 'Не удалось получить ответ.')
+        
+        return ChatResponse(
+            response=ai_response,
+            timestamp=datetime.now().isoformat()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка чата: {str(e)}")
 
 
 # Дополнительные служебные эндпоинты

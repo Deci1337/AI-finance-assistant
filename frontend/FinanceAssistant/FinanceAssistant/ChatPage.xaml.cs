@@ -1,3 +1,4 @@
+using FinanceAssistant.Data;
 using FinanceAssistant.Models;
 using FinanceAssistant.Services;
 using Microsoft.Maui.Controls.Shapes;
@@ -7,11 +8,13 @@ namespace FinanceAssistant
     public partial class ChatPage : ContentPage
     {
         private readonly FinanceService _financeService;
+        private readonly DatabaseService _databaseService;
 
-        public ChatPage()
+        public ChatPage(FinanceService financeService, DatabaseService databaseService)
         {
             InitializeComponent();
-            _financeService = new FinanceService();
+            _financeService = financeService;
+            _databaseService = databaseService;
             
             AddWelcomeMessage();
         }
@@ -28,9 +31,9 @@ namespace FinanceAssistant
                 "Привет! Я ваш финансовый помощник. " +
                 "Просто расскажите мне о ваших доходах и расходах, и я автоматически добавлю их в ваш список транзакций.\n\n" +
                 "Примеры:\n" +
-                "• Купил хлеб за 50 рублей и молоко за 80 рублей\n" +
-                "• Получил зарплату 85000 рублей\n" +
-                "• Вчера потратил 2000 на обед в ресторане"
+                " Купил хлеб за 50 рублей и молоко за 80 рублей\n" +
+                " Получил зарплату 85000 рублей\n" +
+                " Вчера потратил 2000 на обед в ресторане"
             );
             MessagesContainer.Children.Add(messageView);
         }
@@ -86,7 +89,7 @@ namespace FinanceAssistant
                         "Не удалось извлечь транзакции из вашего сообщения. " +
                         "Попробуйте указать сумму и тип транзакции более явно.\n\n" +
                         (result.Questions != null && result.Questions.Count > 0 
-                            ? string.Join("\n", result.Questions.Select(q => $"• {q}"))
+                            ? string.Join("\n", result.Questions.Select(q => $" {q}"))
                             : "")
                     );
                     MessagesContainer.Children.Add(noTransactionsView);
@@ -227,7 +230,7 @@ namespace FinanceAssistant
 
             var categoryLabel = new Label
             {
-                Text = $"{extractedTransaction.Category} • {extractedTransaction.Date}",
+                Text = $"{extractedTransaction.Category} - {extractedTransaction.Date}",
                 TextColor = Color.FromArgb("#8B949E"),
                 FontSize = 12
             };
@@ -270,27 +273,32 @@ namespace FinanceAssistant
         {
             if (!extractedTransaction.Amount.HasValue)
             {
-                await DisplayAlert("Ошибка", "Нельзя добавить транзакцию без суммы", "ОК");
+                await DisplayAlert("Ошибка", "Нельзя добавить транзакцию без суммы", "OK");
                 return;
             }
+
+            // Get or create category in database
+            var transactionType = extractedTransaction.Type == "income" ? TransactionType.Income : TransactionType.Expense;
+            var categoryName = MapCategory(extractedTransaction.Category);
+            var category = await _databaseService.GetOrCreateCategoryAsync(categoryName, transactionType);
 
             var transaction = new Transaction
             {
                 Title = extractedTransaction.Title,
                 Amount = extractedTransaction.Amount.Value,
-                Type = extractedTransaction.Type == "income" ? TransactionType.Income : TransactionType.Expense,
-                Category = MapCategory(extractedTransaction.Category),
+                Type = transactionType,
+                CategoryId = category.Id,
                 Date = DateTime.TryParse(extractedTransaction.Date, out var date) ? date : DateTime.Now,
                 Description = extractedTransaction.Description
             };
 
-            await _financeService.AddTransactionAsync(transaction);
+            await _databaseService.SaveTransactionAsync(transaction);
 
             var successView = CreateBotMessageView($"Транзакция '{transaction.Title}' успешно добавлена!");
             MessagesContainer.Children.Add(successView);
             ScrollToBottom();
 
-            await DisplayAlert("Успешно", "Транзакция добавлена", "ОК");
+            await DisplayAlert("Успешно", "Транзакция добавлена", "OK");
         }
 
         private string MapCategory(string category)
@@ -338,7 +346,7 @@ namespace FinanceAssistant
             {
                 var warningLabel = new Label
                 {
-                    Text = $"• {warning}",
+                    Text = $" {warning}",
                     TextColor = Color.FromArgb("#FF6B6B"),
                     FontSize = 12
                 };
@@ -364,4 +372,3 @@ namespace FinanceAssistant
         }
     }
 }
-

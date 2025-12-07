@@ -1,94 +1,35 @@
-using FinanceAssistant.Models;
 using System.Text;
 using System.Text.Json;
 
 namespace FinanceAssistant.Services
 {
+    /// <summary>
+    /// Service for communicating with the backend API for AI-powered transaction extraction
+    /// </summary>
     public class FinanceService
     {
-        private const string API_BASE_URL = "http://localhost:8000";
-        
-        // Stub data - will be replaced with backend API calls
-        private readonly List<Transaction> _transactions;
-        private readonly UserProfile _userProfile;
+        private string _apiBaseUrl = "http://localhost:8000";
 
         public FinanceService()
         {
-            _userProfile = new UserProfile
-            {
-                Name = "Alex",
-                TotalBalance = 125430.50m,
-                MonthlyIncome = 85000m,
-                MonthlyExpense = 42350m
-            };
-
-            _transactions = GenerateStubTransactions();
         }
 
-        private List<Transaction> GenerateStubTransactions()
+        /// <summary>
+        /// Set the API base URL (for connecting to backend from different devices)
+        /// </summary>
+        public void SetApiBaseUrl(string url)
         {
-            return new List<Transaction>
-            {
-                new() { Id = 1, Title = "Salary", Amount = 85000, Type = TransactionType.Income, Category = "Work", Date = DateTime.Now.AddDays(-1) },
-                new() { Id = 2, Title = "Groceries", Amount = 3500, Type = TransactionType.Expense, Category = "Food", Date = DateTime.Now.AddDays(-1) },
-                new() { Id = 3, Title = "Netflix", Amount = 799, Type = TransactionType.Expense, Category = "Entertainment", Date = DateTime.Now.AddDays(-2) },
-                new() { Id = 4, Title = "Freelance", Amount = 15000, Type = TransactionType.Income, Category = "Work", Date = DateTime.Now.AddDays(-3) },
-                new() { Id = 5, Title = "Restaurant", Amount = 2800, Type = TransactionType.Expense, Category = "Food", Date = DateTime.Now.AddDays(-3) },
-                new() { Id = 6, Title = "Transport", Amount = 1500, Type = TransactionType.Expense, Category = "Transport", Date = DateTime.Now.AddDays(-4) },
-                new() { Id = 7, Title = "Gym", Amount = 3000, Type = TransactionType.Expense, Category = "Health", Date = DateTime.Now.AddDays(-5) },
-                new() { Id = 8, Title = "Bonus", Amount = 10000, Type = TransactionType.Income, Category = "Work", Date = DateTime.Now.AddDays(-7) },
-            };
+            _apiBaseUrl = url.TrimEnd('/');
         }
 
-        public Task<UserProfile> GetUserProfileAsync()
-        {
-            return Task.FromResult(_userProfile);
-        }
+        /// <summary>
+        /// Get the current API base URL
+        /// </summary>
+        public string GetApiBaseUrl() => _apiBaseUrl;
 
-        public Task<List<Transaction>> GetRecentTransactionsAsync(int count = 10)
-        {
-            return Task.FromResult(_transactions.OrderByDescending(t => t.Date).Take(count).ToList());
-        }
-
-        public Task<List<ChartDataPoint>> GetChartDataAsync(int days = 7)
-        {
-            var data = new List<ChartDataPoint>();
-            var random = new Random(42); // Fixed seed for consistent stub data
-
-            for (int i = days - 1; i >= 0; i--)
-            {
-                var date = DateTime.Now.AddDays(-i).Date;
-                data.Add(new ChartDataPoint
-                {
-                    Date = date,
-                    Income = random.Next(5000, 20000),
-                    Expense = random.Next(2000, 10000)
-                });
-            }
-
-            return Task.FromResult(data);
-        }
-
-        public Task AddTransactionAsync(Transaction transaction)
-        {
-            transaction.Id = _transactions.Count + 1;
-            transaction.Date = DateTime.Now;
-            _transactions.Add(transaction);
-            
-            if (transaction.Type == TransactionType.Income)
-            {
-                _userProfile.TotalBalance += transaction.Amount;
-                _userProfile.MonthlyIncome += transaction.Amount;
-            }
-            else
-            {
-                _userProfile.TotalBalance -= transaction.Amount;
-                _userProfile.MonthlyExpense += transaction.Amount;
-            }
-
-            return Task.CompletedTask;
-        }
-
+        /// <summary>
+        /// Extract transactions from a user message using the backend AI
+        /// </summary>
         public async Task<TransactionExtractionResult> ExtractTransactionsFromMessageAsync(string message, string? context = null)
         {
             try
@@ -105,7 +46,7 @@ namespace FinanceAssistant.Services
                 var json = JsonSerializer.Serialize(request);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var response = await httpClient.PostAsync($"{API_BASE_URL}/extract-transactions", content);
+                var response = await httpClient.PostAsync($"{_apiBaseUrl}/extract-transactions", content);
                 
                 if (response.IsSuccessStatusCode)
                 {
@@ -120,6 +61,30 @@ namespace FinanceAssistant.Services
                         return result;
                     }
                 }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    System.Diagnostics.Debug.WriteLine($"API Error: {response.StatusCode} - {errorContent}");
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"HTTP Error: {ex.Message}");
+                return new TransactionExtractionResult
+                {
+                    Transactions = new List<ExtractedTransaction>(),
+                    Analysis = $"Не удалось подключиться к серверу ({_apiBaseUrl}). Убедитесь, что backend запущен.",
+                    Questions = new List<string> { "Проверьте, что backend сервер запущен на порту 8000" }
+                };
+            }
+            catch (TaskCanceledException)
+            {
+                return new TransactionExtractionResult
+                {
+                    Transactions = new List<ExtractedTransaction>(),
+                    Analysis = "Превышено время ожидания ответа от сервера.",
+                    Questions = new List<string> { "Попробуйте отправить сообщение еще раз" }
+                };
             }
             catch (Exception ex)
             {
@@ -129,12 +94,83 @@ namespace FinanceAssistant.Services
             return new TransactionExtractionResult
             {
                 Transactions = new List<ExtractedTransaction>(),
-                Analysis = "Не удалось подключиться к серверу. Проверьте, что backend запущен.",
+                Analysis = "Не удалось обработать запрос. Попробуйте позже.",
                 Questions = new List<string> { "Проверьте подключение к серверу" }
             };
         }
+
+        /// <summary>
+        /// Send a chat message to the AI assistant
+        /// </summary>
+        public async Task<ChatResult> SendChatMessageAsync(string message, string? context = null)
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+                httpClient.Timeout = TimeSpan.FromSeconds(30);
+
+                var request = new
+                {
+                    message = message,
+                    context = context
+                };
+
+                var json = JsonSerializer.Serialize(request);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await httpClient.PostAsync($"{_apiBaseUrl}/chat", content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var result = JsonSerializer.Deserialize<ChatResult>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    
+                    if (result != null)
+                    {
+                        return result;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error sending chat message: {ex.Message}");
+                return new ChatResult
+                {
+                    Response = $"Ошибка подключения к серверу: {ex.Message}",
+                    Timestamp = DateTime.Now.ToString("o")
+                };
+            }
+
+            return new ChatResult
+            {
+                Response = "Не удалось получить ответ от ассистента.",
+                Timestamp = DateTime.Now.ToString("o")
+            };
+        }
+
+        /// <summary>
+        /// Check if the backend server is available
+        /// </summary>
+        public async Task<bool> IsServerAvailableAsync()
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+                httpClient.Timeout = TimeSpan.FromSeconds(5);
+                var response = await httpClient.GetAsync($"{_apiBaseUrl}/health");
+                return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
     }
 
+    // DTOs for API responses
     public class TransactionExtractionResult
     {
         public List<ExtractedTransaction> Transactions { get; set; } = new();
@@ -161,5 +197,10 @@ namespace FinanceAssistant.Services
         public decimal TotalExpense { get; set; }
         public int TransactionsCount { get; set; }
     }
-}
 
+    public class ChatResult
+    {
+        public string Response { get; set; } = string.Empty;
+        public string Timestamp { get; set; } = string.Empty;
+    }
+}
