@@ -4,6 +4,8 @@ using FinanceAssistant.Services;
 using Microsoft.Maui.Controls.Shapes;
 using System.Text.RegularExpressions;
 using Microsoft.Maui.Media;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace FinanceAssistant
 {
@@ -23,10 +25,41 @@ namespace FinanceAssistant
             AddWelcomeMessage();
         }
 
-        protected override void OnAppearing()
+        protected override async void OnAppearing()
         {
             base.OnAppearing();
+            await LoadChatHistoryAsync();
             ScrollToBottom();
+        }
+
+        private async Task LoadChatHistoryAsync()
+        {
+            try
+            {
+                var history = await _databaseService.GetChatHistoryAsync(20);
+                if (history != null && history.Count > 0)
+                {
+                    // Clear existing messages except welcome message
+                    var welcomeMessage = MessagesContainer.Children.FirstOrDefault();
+                    MessagesContainer.Children.Clear();
+                    if (welcomeMessage != null)
+                        MessagesContainer.Children.Add(welcomeMessage);
+                    
+                    // Load history in chronological order
+                    var sortedHistory = history.OrderBy(m => m.Timestamp).ToList();
+                    foreach (var msg in sortedHistory)
+                    {
+                        if (msg.IsUser)
+                            AddUserMessage(msg.Message);
+                        else
+                            MessagesContainer.Children.Add(CreateBotMessageView(msg.Message));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading chat history: {ex.Message}");
+            }
         }
 
         private async void OnBackTapped(object? sender, EventArgs e)
@@ -182,6 +215,9 @@ namespace FinanceAssistant
             AddUserMessage(message);
             ScrollToBottom();
 
+            // Save user message to history
+            await _databaseService.SaveChatMessageAsync(message, isUser: true);
+
             // Analyze friendliness in background
             _ = AnalyzeFriendlinessAsync(message);
 
@@ -222,32 +258,42 @@ namespace FinanceAssistant
                     }
                     else
                     {
-                        var noTransactionsView = CreateBotMessageView(
-                            result.Analysis ?? "Не удалось извлечь транзакции.\n\n" +
+                        var errorText = result.Analysis ?? "Не удалось извлечь транзакции.\n\n" +
                             "Попробуйте указать сумму явно, например:\n" +
-                            "'Потратил 500 рублей на еду'"
-                        );
+                            "'Потратил 500 рублей на еду'";
+                        var noTransactionsView = CreateBotMessageView(errorText);
                         MessagesContainer.Children.Add(noTransactionsView);
                         ScrollToBottom();
+                        
+                        // Save bot response to history
+                        await _databaseService.SaveChatMessageAsync(errorText, isUser: false);
                     }
                 }
                 else
                 {
-                    // Handle as general chat
-                    var chatResult = await _financeService.SendChatMessageAsync(message);
+                    // Handle as general chat - prepare context with transactions
+                    var context = await BuildContextAsync();
+                    var chatResult = await _financeService.SendChatMessageAsync(message, context);
                     MessagesContainer.Children.Remove(loadingView);
 
                     var botResponse = CreateBotMessageView(chatResult.Response);
                     MessagesContainer.Children.Add(botResponse);
                     ScrollToBottom();
+                    
+                    // Save bot response to history
+                    await _databaseService.SaveChatMessageAsync(chatResult.Response, isUser: false);
                 }
             }
             catch (Exception ex)
             {
                 MessagesContainer.Children.Remove(loadingView);
-                var errorView = CreateBotMessageView($"Произошла ошибка: {ex.Message}");
+                var errorText = $"Произошла ошибка: {ex.Message}";
+                var errorView = CreateBotMessageView(errorText);
                 MessagesContainer.Children.Add(errorView);
                 ScrollToBottom();
+                
+                // Save error message to history
+                await _databaseService.SaveChatMessageAsync(errorText, isUser: false);
             }
 
             MessageEntry.IsEnabled = true;
@@ -750,8 +796,9 @@ namespace FinanceAssistant
                 }
                 else
                 {
-                    // Handle as general chat
-                    var chatResult = await _financeService.SendChatMessageAsync(message);
+                    // Handle as general chat - prepare context with transactions
+                    var context = await BuildContextAsync();
+                    var chatResult = await _financeService.SendChatMessageAsync(message, context);
                     MessagesContainer.Children.Remove(loadingView);
 
                     var botResponse = CreateBotMessageView(chatResult.Response);
