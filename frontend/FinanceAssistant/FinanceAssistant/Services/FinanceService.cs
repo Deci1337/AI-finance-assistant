@@ -375,7 +375,7 @@ namespace FinanceAssistant.Services
     {
         public string Text { get; set; } = string.Empty;
         public string? Error { get; set; }
-        public double Confidence { get; set; }
+        public double? Confidence { get; set; }
     }
 
     public class ChatResult

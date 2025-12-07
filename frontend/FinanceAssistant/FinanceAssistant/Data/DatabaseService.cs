@@ -1,5 +1,6 @@
 using SQLite;
 using FinanceAssistant.Models;
+using System.Linq;
 
 namespace FinanceAssistant.Data
 {
@@ -23,6 +24,7 @@ namespace FinanceAssistant.Data
             await _database.CreateTableAsync<Transaction>();
             await _database.CreateTableAsync<Category>();
             await _database.CreateTableAsync<UserProfile>();
+            await _database.CreateTableAsync<ChatMessage>();
 
             await SeedDefaultDataAsync();
         }
@@ -455,6 +457,48 @@ namespace FinanceAssistant.Data
         {
             await InitAsync();
             await _database!.DeleteAllAsync<Transaction>();
+        }
+
+        // Chat history operations
+        public async Task SaveChatMessageAsync(string message, bool isUser)
+        {
+            await InitAsync();
+            var chatMessage = new ChatMessage
+            {
+                Message = message,
+                IsUser = isUser,
+                Timestamp = DateTime.Now
+            };
+            await _database!.InsertAsync(chatMessage);
+            
+            // Keep only last 20 messages
+            var allMessages = await _database.Table<ChatMessage>()
+                .OrderByDescending(m => m.Timestamp)
+                .ToListAsync();
+            
+            if (allMessages.Count > 20)
+            {
+                var messagesToDelete = allMessages.Skip(20).ToList();
+                foreach (var msg in messagesToDelete)
+                {
+                    await _database.DeleteAsync(msg);
+                }
+            }
+        }
+
+        public async Task<List<ChatMessage>> GetChatHistoryAsync(int limit = 20)
+        {
+            await InitAsync();
+            return await _database!.Table<ChatMessage>()
+                .OrderByDescending(m => m.Timestamp)
+                .Take(limit)
+                .ToListAsync();
+        }
+
+        public async Task ClearChatHistoryAsync()
+        {
+            await InitAsync();
+            await _database!.DeleteAllAsync<ChatMessage>();
         }
     }
 }
