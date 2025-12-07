@@ -16,24 +16,160 @@ namespace FinanceAssistant
             _financeService = financeService;
             _databaseService = databaseService;
             
+            UpdateConnectionStatus();
             AddWelcomeMessage();
+            _ = CheckServerConnectionAsync();
         }
 
         protected override void OnAppearing()
         {
             base.OnAppearing();
             ScrollToBottom();
+            UpdateConnectionStatus();
+        }
+
+        private void UpdateConnectionStatus()
+        {
+            ConnectionStatusLabel.Text = $"Сервер: {_financeService.GetApiBaseUrl()}";
+        }
+
+        private async Task CheckServerConnectionAsync()
+        {
+            var isAvailable = await _financeService.IsServerAvailableAsync();
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                if (isAvailable)
+                {
+                    ConnectionIndicator.Text = "OK";
+                    ConnectionIndicator.TextColor = Color.FromArgb("#00D09E");
+                }
+                else
+                {
+                    ConnectionIndicator.Text = "Offline";
+                    ConnectionIndicator.TextColor = Color.FromArgb("#FF6B6B");
+                }
+            });
+        }
+
+        private async void OnBackTapped(object? sender, TappedEventArgs e)
+        {
+            await Shell.Current.GoToAsync("..");
+        }
+
+        private async void OnTitleTapped(object? sender, TappedEventArgs e)
+        {
+            await ShowServerSettingsAsync();
+        }
+
+        private async void OnSettingsTapped(object? sender, TappedEventArgs e)
+        {
+            await ShowServerSettingsAsync();
+        }
+
+        private async Task ShowServerSettingsAsync()
+        {
+            string action = await DisplayActionSheet(
+                "Настройки сервера", 
+                "Отмена", 
+                null, 
+                "Ввести IP адрес", 
+                "Использовать localhost (Windows)",
+                "Использовать 10.0.2.2 (Android эмулятор)",
+                "Как узнать IP компьютера?",
+                "Проверить подключение"
+            );
+
+            if (action == "Ввести IP адрес")
+            {
+                string? ipAddress = await DisplayPromptAsync(
+                    "IP адрес сервера", 
+                    "Введите IP адрес компьютера с backend\n(например: 192.168.1.100)", 
+                    "OK", 
+                    "Отмена", 
+                    placeholder: "192.168.1.100"
+                );
+                
+                if (!string.IsNullOrWhiteSpace(ipAddress))
+                {
+                    var ip = ipAddress.Trim();
+                    // Add http:// and port if not present
+                    if (!ip.StartsWith("http"))
+                    {
+                        ip = $"http://{ip}";
+                    }
+                    if (!ip.Contains(":8000"))
+                    {
+                        ip = $"{ip}:8000";
+                    }
+                    
+                    _financeService.SetApiBaseUrl(ip);
+                    UpdateConnectionStatus();
+                    await DisplayAlert("Готово", $"Адрес сервера установлен: {ip}", "OK");
+                    await CheckServerConnectionAsync();
+                }
+            }
+            else if (action == "Использовать localhost (Windows)")
+            {
+                _financeService.SetApiBaseUrl("http://localhost:8000");
+                UpdateConnectionStatus();
+                await CheckServerConnectionAsync();
+            }
+            else if (action == "Использовать 10.0.2.2 (Android эмулятор)")
+            {
+                _financeService.SetApiBaseUrl("http://10.0.2.2:8000");
+                UpdateConnectionStatus();
+                await CheckServerConnectionAsync();
+            }
+            else if (action == "Как узнать IP компьютера?")
+            {
+                await DisplayAlert("Как узнать IP",
+                    "Windows:\n" +
+                    "1. Откройте PowerShell\n" +
+                    "2. Введите: ipconfig\n" +
+                    "3. Найдите 'IPv4 Address' в секции Wi-Fi или Ethernet\n\n" +
+                    "Пример: 192.168.1.100\n\n" +
+                    "Важно:\n" +
+                    "- Телефон и компьютер должны быть в одной Wi-Fi сети\n" +
+                    "- Backend должен быть запущен на компьютере\n" +
+                    "- Firewall должен разрешать порт 8000",
+                    "OK"
+                );
+            }
+            else if (action == "Проверить подключение")
+            {
+                var isAvailable = await _financeService.IsServerAvailableAsync();
+                if (isAvailable)
+                {
+                    await DisplayAlert("Подключение", "Сервер доступен!", "OK");
+                    ConnectionIndicator.Text = "OK";
+                    ConnectionIndicator.TextColor = Color.FromArgb("#00D09E");
+                }
+                else
+                {
+                    await DisplayAlert("Ошибка", 
+                        $"Не удалось подключиться к серверу:\n{_financeService.GetApiBaseUrl()}\n\n" +
+                        "Проверьте:\n" +
+                        "1. Backend запущен (python main.py)\n" +
+                        "2. Правильный IP адрес\n" +
+                        "3. Firewall не блокирует порт 8000",
+                        "OK"
+                    );
+                    ConnectionIndicator.Text = "Offline";
+                    ConnectionIndicator.TextColor = Color.FromArgb("#FF6B6B");
+                }
+            }
         }
 
         private void AddWelcomeMessage()
         {
             var messageView = CreateBotMessageView(
-                "Привет! Я ваш финансовый помощник. " +
-                "Просто расскажите мне о ваших доходах и расходах, и я автоматически добавлю их в ваш список транзакций.\n\n" +
+                "Привет! Я ваш финансовый помощник.\n\n" +
+                "Расскажите мне о ваших тратах, и я автоматически добавлю их.\n\n" +
                 "Примеры:\n" +
-                " Купил хлеб за 50 рублей и молоко за 80 рублей\n" +
-                " Получил зарплату 85000 рублей\n" +
-                " Вчера потратил 2000 на обед в ресторане"
+                "- Купил хлеб за 50 рублей\n" +
+                "- Получил зарплату 85000\n" +
+                "- Потратил 2000 на обед\n\n" +
+                "Нажмите * чтобы настроить IP сервера"
             );
             MessagesContainer.Children.Add(messageView);
         }
@@ -86,11 +222,9 @@ namespace FinanceAssistant
                 else
                 {
                     var noTransactionsView = CreateBotMessageView(
-                        "Не удалось извлечь транзакции из вашего сообщения. " +
-                        "Попробуйте указать сумму и тип транзакции более явно.\n\n" +
-                        (result.Questions != null && result.Questions.Count > 0 
-                            ? string.Join("\n", result.Questions.Select(q => $" {q}"))
-                            : "")
+                        result.Analysis ?? "Не удалось извлечь транзакции.\n\n" +
+                        "Попробуйте указать сумму явно, например:\n" +
+                        "'Потратил 500 рублей на еду'"
                     );
                     MessagesContainer.Children.Add(noTransactionsView);
                     ScrollToBottom();
@@ -99,7 +233,7 @@ namespace FinanceAssistant
             catch (Exception ex)
             {
                 MessagesContainer.Children.Remove(loadingView);
-                var errorView = CreateBotMessageView($"Произошла ошибка: {ex.Message}");
+                var errorView = CreateBotMessageView($"Ошибка: {ex.Message}\n\nНажмите * для настройки сервера");
                 MessagesContainer.Children.Add(errorView);
                 ScrollToBottom();
             }
@@ -180,7 +314,7 @@ namespace FinanceAssistant
             return border;
         }
 
-        private View CreateTransactionPreviewView(FinanceAssistant.Services.ExtractedTransaction extractedTransaction, FinanceAssistant.Services.TransactionExtractionResult result)
+        private View CreateTransactionPreviewView(ExtractedTransaction extractedTransaction, TransactionExtractionResult result)
         {
             var border = new Border
             {
@@ -269,7 +403,7 @@ namespace FinanceAssistant
             return border;
         }
 
-        private async Task AddTransactionFromExtracted(FinanceAssistant.Services.ExtractedTransaction extractedTransaction)
+        private async Task AddTransactionFromExtracted(ExtractedTransaction extractedTransaction)
         {
             if (!extractedTransaction.Amount.HasValue)
             {
@@ -346,7 +480,7 @@ namespace FinanceAssistant
             {
                 var warningLabel = new Label
                 {
-                    Text = $" {warning}",
+                    Text = $"- {warning}",
                     TextColor = Color.FromArgb("#FF6B6B"),
                     FontSize = 12
                 };
