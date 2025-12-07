@@ -1,6 +1,7 @@
 ﻿using FinanceAssistant.Controls;
 using FinanceAssistant.Models;
 using FinanceAssistant.Services;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace FinanceAssistant
 {
