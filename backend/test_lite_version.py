@@ -26,16 +26,16 @@ def test_model_configuration():
     print(f"\nОсновная модель (MODEL): {MODEL}")
     print(f"Приоритет моделей: {PREFERRED_MODELS}")
     
-    if MODEL == "GigaChat":
-        print("✅ Базовая GigaChat установлена как основная модель")
+    if MODEL == "GigaChat-Lite":
+        print("✅ Lite установлена как основная модель")
     else:
-        print(f"❌ Основная модель не GigaChat: {MODEL}")
+        print(f"❌ Основная модель не Lite: {MODEL}")
         return False
     
-    if PREFERRED_MODELS[0] == "GigaChat":
-        print("✅ GigaChat первая в списке приоритетов")
+    if PREFERRED_MODELS[0] == "GigaChat-Lite":
+        print("✅ Lite первая в списке приоритетов")
     else:
-        print(f"❌ GigaChat не первая в приоритетах: {PREFERRED_MODELS}")
+        print(f"❌ Lite не первая в приоритетах: {PREFERRED_MODELS}")
         return False
     
     return True
@@ -261,12 +261,10 @@ def main():
     
     if detected_model:
         print(f"\nИспользуемая модель: {detected_model}")
-        if detected_model == "GigaChat":
-            print("✅ Используется базовая GigaChat (основная модель)")
-        elif detected_model == "GigaChat-Plus":
-            print("✅ Используется GigaChat-Plus")
+        if detected_model == "GigaChat-Lite":
+            print("✅ Используется Lite версия (основная модель)")
         elif detected_model == "GigaChat-Pro":
-            print("⚠️  Используется Pro версия (базовая недоступна)")
+            print("⚠️  Используется Pro версия (Lite недоступна)")
     
     passed = sum(1 for v in results.values() if v)
     total = len(results)

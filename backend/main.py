@@ -20,8 +20,7 @@ from gigachat_integration import (
     transcribe_audio_with_fallback,
     get_access_token,
     chat_completion,
-    GigaChatAIClient,
-    is_transaction_message
+    GigaChatAIClient
 )
 
 # Создание экземпляра FastAPI приложения
@@ -385,20 +384,6 @@ async def extract_transactions(request: TransactionExtractionRequest) -> Transac
     - "Вчера потратил 2000 на обед в ресторане"
     """
     try:
-        # Проверяем, является ли сообщение запросом на транзакцию
-        if not is_transaction_message(request.user_message):
-            # Если это не транзакция, возвращаем пустой результат
-            return TransactionExtractionResponse(
-                extraction_id=f"extraction_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-                extraction_date=datetime.now().isoformat(),
-                transactions=[],
-                extracted_info=None,
-                analysis="Это сообщение не содержит информации о транзакциях. Используйте /chat для обычных вопросов.",
-                questions=None,
-                warnings=None,
-                extracted_parameters=None
-            )
-        
         result = extract_transactions_with_fallback(
             request.user_message,
             request.context
@@ -572,70 +557,6 @@ async def chat_with_ai(request: ChatRequest) -> ChatResponse:
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка чата: {str(e)}")
-
-
-class FriendlinessRequest(BaseModel):
-    """Модель запроса для анализа дружелюбности"""
-    message: str
-
-
-class FriendlinessResponse(BaseModel):
-    """Модель ответа для анализа дружелюбности"""
-    friendliness_score: float
-    sentiment: str
-    timestamp: str
-
-
-@app.post("/analyze-friendliness", response_model=FriendlinessResponse)
-async def analyze_friendliness(request: FriendlinessRequest) -> FriendlinessResponse:
-    """
-    Анализ дружелюбности сообщения пользователя
-    Возвращает оценку от -1 (очень грубо) до 1 (очень дружелюбно)
-    """
-    try:
-        text_lower = request.message.lower()
-        
-        positive_words = [
-            "спасибо", "благодарю", "пожалуйста", "отлично", "хорошо", "супер",
-            "класс", "круто", "молодец", "здорово", "прекрасно", "замечательно",
-            "рад", "счастлив", "люблю", "нравится", "thanks", "please", "great",
-            "good", "nice", "awesome", "love", "like", "appreciate"
-        ]
-        
-        negative_words = [
-            "плохо", "ужас", "отстой", "дурак", "идиот", "тупой", "ненавижу",
-            "бесит", "раздражает", "злой", "злюсь", "достало", "надоело",
-            "damn", "hate", "stupid", "idiot", "bad", "terrible", "angry", "sucks"
-        ]
-        
-        rude_words = ["дерьмо", "говно", "хрен", "черт", "блять", "сука"]
-        
-        positive_count = sum(1 for word in positive_words if word in text_lower)
-        negative_count = sum(1 for word in negative_words if word in text_lower)
-        rude_count = sum(1 for word in rude_words if word in text_lower)
-        
-        total = positive_count + negative_count + rude_count + 1
-        score = (positive_count - negative_count - rude_count * 2) / total
-        score = max(-1.0, min(1.0, score))
-        
-        if score > 0.5:
-            sentiment = "very_friendly"
-        elif score > 0.2:
-            sentiment = "friendly"
-        elif score > -0.2:
-            sentiment = "neutral"
-        elif score > -0.5:
-            sentiment = "unfriendly"
-        else:
-            sentiment = "rude"
-        
-        return FriendlinessResponse(
-            friendliness_score=round(score, 2),
-            sentiment=sentiment,
-            timestamp=datetime.now().isoformat()
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка анализа: {str(e)}")
 
 
 # Дополнительные служебные эндпоинты

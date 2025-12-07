@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using Microsoft.Maui.Storage;
-using Microsoft.Maui.Devices;
 
 namespace FinanceAssistant.Services
 {
@@ -108,15 +107,6 @@ namespace FinanceAssistant.Services
         {
             try
             {
-                // Для Android без Termux - не пытаемся запускать локально
-                // Используем облачный сервер или локальный сервер на ПК
-                if (DeviceInfo.Platform == DevicePlatform.Android)
-                {
-                    Debug.WriteLine("Android: Используйте облачный сервер или локальный сервер на ПК");
-                    // Пытаемся найти работающий сервер в сети
-                    return await TryFindServerInNetworkAsync();
-                }
-                
                 // Проверяем, не запущен ли уже backend
                 if (await IsBackendRunningAsync())
                 {
@@ -130,14 +120,19 @@ namespace FinanceAssistant.Services
                 if (!File.Exists(mainPyPath))
                 {
                     Debug.WriteLine($"main.py not found at: {mainPyPath}");
-                    // Пытаемся найти сервер в сети
-                    return await TryFindServerInNetworkAsync();
+                    return false;
                 }
 
                 // Определяем исполняемый файл Python
                 var pythonExe = FindPythonExecutable();
                 
-                // Запускаем Python процесс для Windows/iOS/macOS
+                // Для Android через Termux используем специальный подход
+                if (DeviceInfo.Platform == DevicePlatform.Android)
+                {
+                    return await StartBackendAndroidAsync(backendPath, mainPyPath, pythonExe);
+                }
+                
+                // Запускаем Python процесс для других платформ
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = pythonExe,
@@ -163,54 +158,39 @@ namespace FinanceAssistant.Services
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to start backend: {ex.Message}");
-                // Пытаемся найти сервер в сети как fallback
-                return await TryFindServerInNetworkAsync();
+                return false;
+            }
+        }
+
+        private async Task<bool> StartBackendAndroidAsync(string backendPath, string mainPyPath, string pythonExe)
+        {
+            try
+            {
+                // Для Android пробуем запустить через Termux или напрямую
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = pythonExe,
+                    Arguments = $"\"{mainPyPath}\"",
+                    WorkingDirectory = backendPath,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                
+                _backendProcess = new Process { StartInfo = startInfo };
+                _backendProcess.Start();
+                
+                await Task.Delay(3000);
+                return await IsBackendRunningAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Android backend start failed: {ex.Message}");
+                return false;
             }
         }
         
-        private async Task<bool> TryFindServerInNetworkAsync()
-        {
-            // Пытаемся найти работающий сервер в локальной сети
-            // Это полезно если backend запущен на ПК в той же Wi-Fi сети
-            var commonUrls = new[]
-            {
-                "http://127.0.0.1:8000",
-                "http://localhost:8000",
-                // Добавляем IP из настроек если есть
-            };
-            
-            var customUrl = Preferences.Get("api_base_url", string.Empty);
-            if (!string.IsNullOrEmpty(customUrl))
-            {
-                var urlsList = commonUrls.ToList();
-                urlsList.Insert(0, customUrl);
-                commonUrls = urlsList.ToArray();
-            }
-            
-            foreach (var url in commonUrls)
-            {
-                try
-                {
-                    using var client = new HttpClient();
-                    client.Timeout = TimeSpan.FromSeconds(1);
-                    var response = await client.GetAsync($"{url}/health");
-                    if (response.IsSuccessStatusCode)
-                    {
-                        Debug.WriteLine($"Found backend at: {url}");
-                        // Сохраняем найденный URL для использования
-                        Preferences.Set("api_base_url", url);
-                        return true;
-                    }
-                }
-                catch
-                {
-                    continue;
-                }
-            }
-            
-            return false;
-        }
-
         public async Task<bool> IsBackendRunningAsync()
         {
             try

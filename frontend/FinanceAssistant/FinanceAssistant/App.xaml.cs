@@ -24,15 +24,7 @@ namespace FinanceAssistant
                 
                 if (!started)
                 {
-                    // Для Android - это нормально, используем облачный сервер или локальный на ПК
-                    if (DeviceInfo.Platform == DevicePlatform.Android)
-                    {
-                        System.Diagnostics.Debug.WriteLine("Android: Backend не запущен локально. Используйте облачный сервер или локальный сервер на ПК в той же Wi-Fi сети.");
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine("Backend не запустился автоматически. Используйте внешний сервер или запустите вручную.");
-                    }
+                    System.Diagnostics.Debug.WriteLine("Backend не запустился автоматически. Используйте внешний сервер или запустите вручную.");
                 }
             }
             catch (Exception ex)
@@ -48,7 +40,9 @@ namespace FinanceAssistant
             // Останавливаем backend при закрытии приложения
             window.Destroying += (s, e) =>
             {
+#if WINDOWS
                 BackendService.Instance.StopBackend();
+#endif
             };
             
             return window;
