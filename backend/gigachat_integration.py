@@ -14,7 +14,7 @@ from io import BytesIO
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-MODEL = "GigaChat-Pro"
+MODEL = "GigaChat-Lite"
 SALUTE_SPEECH_URL = "https://smartspeech.sber.ru/rest/v1/speech:recognize"
 
 
