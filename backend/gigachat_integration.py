@@ -229,9 +229,24 @@ def transcribe_audio_salute_speech(access_token: str, audio_data: bytes, audio_f
     try:
         url = SALUTE_SPEECH_URL
         
+        # Маппинг форматов на правильные Content-Type для SaluteSpeech API
+        content_type_map = {
+            'wav': 'audio/x-pcm;bit=16;rate=16000',
+            'pcm16': 'audio/x-pcm;bit=16;rate=16000',
+            'mp3': 'audio/mpeg',
+            'flac': 'audio/flac',
+            'oggopus': 'audio/ogg;codecs=opus',
+            'opus': 'audio/ogg;codecs=opus',
+            'alaw': 'audio/pcma;rate=8000',
+            'mulaw': 'audio/pcmu;rate=8000'
+        }
+        
+        # Определяем правильный Content-Type
+        content_type = content_type_map.get(audio_format.lower(), 'audio/x-pcm;bit=16;rate=16000')
+        
         headers = {
             'Authorization': f'Bearer {access_token}',
-            'Content-Type': f'audio/{audio_format}'
+            'Content-Type': content_type
         }
         
         response = requests.post(url, headers=headers, data=audio_data, verify=False, timeout=30)
@@ -269,50 +284,10 @@ def transcribe_audio_gigachat(access_token: str, audio_data: bytes, audio_format
     try:
         audio_base64 = base64.b64encode(audio_data).decode('utf-8')
         
-        url = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
-        headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': f'Bearer {access_token}'
-        }
-        
-        payload = {
-            'model': MODEL,
-            'messages': [
-                {
-                    'role': 'user',
-                    'content': [
-                        {
-                            'type': 'audio',
-                            'audio': {
-                                'data': audio_base64,
-                                'format': audio_format
-                            }
-                        }
-                    ]
-                }
-            ],
-            'temperature': 0.3,
-            'max_tokens': 2000
-        }
-        
-        response = requests.post(url, headers=headers, json=payload, verify=False, timeout=30)
-        
-        if response.status_code == 200:
-            result = response.json()
-            if 'choices' in result and len(result['choices']) > 0:
-                return result['choices'][0].get('message', {}).get('content', '')
-        else:
-            # GigaChat Audio API не поддерживается или ошибка
-            # Не вызываем SaluteSpeech здесь, пусть это делает transcribe_audio_with_fallback
-            error_text = response.text
-            try:
-                error_json = response.json()
-                error_message = error_json.get('message', error_text)
-                print(f"GigaChat Audio API error: {response.status_code} - {error_message}")
-            except:
-                print(f"GigaChat Audio API error: {response.status_code} - {error_text}")
-            return None
+        # GigaChat Audio API не поддерживается через chat/completions в текущей версии API
+        # Используем SaluteSpeech как основной метод для распознавания речи
+        print("Info: GigaChat Audio API через chat/completions не поддерживается. Используем SaluteSpeech.")
+        return None
     except Exception as e:
         print(f"GigaChat audio transcription error: {str(e)}")
         return None
