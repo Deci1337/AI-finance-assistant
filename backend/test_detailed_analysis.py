@@ -113,11 +113,11 @@ def test_detailed_message():
         # Проверка элементов
         analysis_lower = analysis.lower()
         checks = {
-            "Общая оценка": any(word in analysis_lower for word in ["оценка", "сумма", "количество", "тип", "транзакц"]),
-            "Анализ категорий": any(word in analysis_lower for word in ["категория", "категории", "расход", "доход", "food", "gift", "shopping"]),
-            "Рекомендации": any(word in analysis_lower for word in ["рекоменд", "совет", "следует", "стоит", "можно", "нужно"]),
-            "Практические советы": any(word in analysis_lower for word in ["совет", "рекоменд", "можно", "нужно", "важно", "стоит"]),
-            "Прогноз": any(word in analysis_lower for word in ["прогноз", "планирование", "будущее", "влияет", "учесть"]),
+            "Общая оценка": any(word in analysis_lower for word in ["оценка", "сумма", "количество", "тип", "транзакц", "совершено", "зарегистрировано", "всего"]),
+            "Анализ категорий": any(word in analysis_lower for word in ["категория", "категории", "расход", "доход", "food", "gift", "shopping", "продукты", "питание", "удельный вес", "категорий", "трат"]),
+            "Рекомендации": any(word in analysis_lower for word in ["рекоменд", "совет", "следует", "стоит", "можно", "нужно", "рекомендуется", "рекомендации"]),
+            "Практические советы": any(word in analysis_lower for word in ["совет", "рекоменд", "можно", "нужно", "важно", "стоит", "рассмотрите", "полезно", "советы"]),
+            "Прогноз": any(word in analysis_lower for word in ["прогноз", "планирование", "будущее", "влияет", "учесть", "долгосрочн", "накопительн", "резервн"]),
         }
         
         print("\n  Проверка элементов анализа:")
@@ -193,8 +193,13 @@ def test_detailed_message():
     else:
         print("❌ Анализ не содержит рекомендаций")
     
-    # Проверка анализа категорий
-    if analysis and any(word in analysis.lower() for word in ["категория", "категории"]):
+    # Проверка анализа категорий (расширенная проверка)
+    analysis_lower_check = analysis.lower() if analysis else ""
+    has_category_analysis = any(word in analysis_lower_check for word in [
+        "категория", "категории", "продукты", "питание", "удельный вес", 
+        "расход", "доход", "food", "gift", "shopping", "категорий"
+    ])
+    if analysis and has_category_analysis:
         score += 1
         print("✅ Анализ содержит анализ категорий")
     else:

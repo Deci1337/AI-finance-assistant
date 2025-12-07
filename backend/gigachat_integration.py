@@ -820,10 +820,62 @@ class GigaChatAIClient:
         return None
     
     def _extract_json(self, text: str) -> Optional[str]:
-        """Извлечение JSON из текста ответа"""
-        json_match = re.search(r'\[.*\]|\{.*\}', text, re.DOTALL)
+        """Извлечение JSON из текста ответа с улучшенной обработкой"""
+        import json
+        
+        # Сначала пробуем простой поиск JSON объекта или массива
+        json_match = re.search(r'\{.*\}|\[.*\]', text, re.DOTALL)
+        
         if json_match:
-            return json_match.group()
+            json_str = json_match.group()
+            # Удаляем управляющие символы, которые могут вызывать проблемы при парсинге
+            # Оставляем только разрешенные: \n, \r, \t
+            json_str = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', json_str)
+            
+            # Пробуем распарсить для проверки валидности
+            try:
+                json.loads(json_str)
+                return json_str
+            except json.JSONDecodeError:
+                # Если не получилось, пробуем найти валидный JSON более точно
+                # Ищем первый { и соответствующий }
+                start_idx = text.find('{')
+                if start_idx != -1:
+                    depth = 0
+                    for i in range(start_idx, len(text)):
+                        if text[i] == '{':
+                            depth += 1
+                        elif text[i] == '}':
+                            depth -= 1
+                            if depth == 0:
+                                json_candidate = text[start_idx:i+1]
+                                json_candidate = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', json_candidate)
+                                try:
+                                    json.loads(json_candidate)
+                                    return json_candidate
+                                except json.JSONDecodeError:
+                                    pass
+                                break
+                
+                # Если объект не найден, пробуем массив
+                start_idx = text.find('[')
+                if start_idx != -1:
+                    depth = 0
+                    for i in range(start_idx, len(text)):
+                        if text[i] == '[':
+                            depth += 1
+                        elif text[i] == ']':
+                            depth -= 1
+                            if depth == 0:
+                                json_candidate = text[start_idx:i+1]
+                                json_candidate = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', json_candidate)
+                                try:
+                                    json.loads(json_candidate)
+                                    return json_candidate
+                                except json.JSONDecodeError:
+                                    pass
+                                break
+        
         return None
     
     def _normalize_emotions(self, emotions: Dict[str, float]) -> Dict[str, float]:
