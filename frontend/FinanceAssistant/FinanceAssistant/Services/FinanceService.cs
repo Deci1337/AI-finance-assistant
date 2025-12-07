@@ -190,6 +190,39 @@ namespace FinanceAssistant.Services
                 return false;
             }
         }
+
+        /// <summary>
+        /// Analyze friendliness of a user message
+        /// </summary>
+        public async Task<FriendlinessResult?> AnalyzeFriendlinessAsync(string message)
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+                httpClient.Timeout = TimeSpan.FromSeconds(10);
+
+                var request = new { message = message };
+                var json = JsonSerializer.Serialize(request);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await httpClient.PostAsync($"{_apiBaseUrl}/analyze-friendliness", content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var result = JsonSerializer.Deserialize<FriendlinessResult>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    return result;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error analyzing friendliness: {ex.Message}");
+            }
+            return null;
+        }
     }
 
     // DTOs for API responses
@@ -223,6 +256,13 @@ namespace FinanceAssistant.Services
     public class ChatResult
     {
         public string Response { get; set; } = string.Empty;
+        public string Timestamp { get; set; } = string.Empty;
+    }
+
+    public class FriendlinessResult
+    {
+        public double FriendlinessScore { get; set; }
+        public string Sentiment { get; set; } = string.Empty;
         public string Timestamp { get; set; } = string.Empty;
     }
 }

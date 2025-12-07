@@ -574,6 +574,70 @@ async def chat_with_ai(request: ChatRequest) -> ChatResponse:
         raise HTTPException(status_code=500, detail=f"Ошибка чата: {str(e)}")
 
 
+class FriendlinessRequest(BaseModel):
+    """Модель запроса для анализа дружелюбности"""
+    message: str
+
+
+class FriendlinessResponse(BaseModel):
+    """Модель ответа для анализа дружелюбности"""
+    friendliness_score: float
+    sentiment: str
+    timestamp: str
+
+
+@app.post("/analyze-friendliness", response_model=FriendlinessResponse)
+async def analyze_friendliness(request: FriendlinessRequest) -> FriendlinessResponse:
+    """
+    Анализ дружелюбности сообщения пользователя
+    Возвращает оценку от -1 (очень грубо) до 1 (очень дружелюбно)
+    """
+    try:
+        text_lower = request.message.lower()
+        
+        positive_words = [
+            "спасибо", "благодарю", "пожалуйста", "отлично", "хорошо", "супер",
+            "класс", "круто", "молодец", "здорово", "прекрасно", "замечательно",
+            "рад", "счастлив", "люблю", "нравится", "thanks", "please", "great",
+            "good", "nice", "awesome", "love", "like", "appreciate"
+        ]
+        
+        negative_words = [
+            "плохо", "ужас", "отстой", "дурак", "идиот", "тупой", "ненавижу",
+            "бесит", "раздражает", "злой", "злюсь", "достало", "надоело",
+            "damn", "hate", "stupid", "idiot", "bad", "terrible", "angry", "sucks"
+        ]
+        
+        rude_words = ["дерьмо", "говно", "хрен", "черт", "блять", "сука"]
+        
+        positive_count = sum(1 for word in positive_words if word in text_lower)
+        negative_count = sum(1 for word in negative_words if word in text_lower)
+        rude_count = sum(1 for word in rude_words if word in text_lower)
+        
+        total = positive_count + negative_count + rude_count + 1
+        score = (positive_count - negative_count - rude_count * 2) / total
+        score = max(-1.0, min(1.0, score))
+        
+        if score > 0.5:
+            sentiment = "very_friendly"
+        elif score > 0.2:
+            sentiment = "friendly"
+        elif score > -0.2:
+            sentiment = "neutral"
+        elif score > -0.5:
+            sentiment = "unfriendly"
+        else:
+            sentiment = "rude"
+        
+        return FriendlinessResponse(
+            friendliness_score=round(score, 2),
+            sentiment=sentiment,
+            timestamp=datetime.now().isoformat()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка анализа: {str(e)}")
+
+
 # Дополнительные служебные эндпоинты
 @app.get("/health")
 async def health_check_legacy() -> Dict[str, str]:

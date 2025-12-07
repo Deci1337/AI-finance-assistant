@@ -186,6 +186,9 @@ namespace FinanceAssistant
             AddUserMessage(message);
             ScrollToBottom();
 
+            // Analyze friendliness in background
+            _ = AnalyzeFriendlinessAsync(message);
+
             var loadingView = CreateLoadingMessageView();
             MessagesContainer.Children.Add(loadingView);
             ScrollToBottom();
@@ -503,6 +506,37 @@ namespace FinanceAssistant
         private static string FormatCurrency(decimal amount)
         {
             return $"{amount:N0} RUB".Replace(",", " ");
+        }
+
+        /// <summary>
+        /// Analyze friendliness of user message and update profile
+        /// </summary>
+        private async Task AnalyzeFriendlinessAsync(string message)
+        {
+            try
+            {
+                var result = await _financeService.AnalyzeFriendlinessAsync(message);
+                if (result != null)
+                {
+                    var profile = await _databaseService.GetUserProfileAsync();
+                    
+                    // Update friendliness using weighted average
+                    // New messages have more weight for recent behavior
+                    int totalMessages = profile.MessagesAnalyzed + 1;
+                    double weight = Math.Min(0.3, 1.0 / totalMessages); // Max 30% weight for new message
+                    
+                    profile.Friendliness = profile.Friendliness * (1 - weight) + result.FriendlinessScore * weight;
+                    profile.MessagesAnalyzed = totalMessages;
+                    
+                    await _databaseService.SaveUserProfileAsync(profile);
+                    
+                    System.Diagnostics.Debug.WriteLine($"Friendliness updated: {result.FriendlinessScore} -> avg: {profile.Friendliness}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error analyzing friendliness: {ex.Message}");
+            }
         }
     }
 }

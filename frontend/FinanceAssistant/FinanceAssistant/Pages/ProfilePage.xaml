@@ -63,6 +63,76 @@
                            HorizontalOptions="Center"/>
                 </VerticalStackLayout>
 
+                <!-- Friendliness Card -->
+                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                        StrokeShape="RoundRectangle 20"
+                        Stroke="Transparent"
+                        Padding="20">
+                    <VerticalStackLayout Spacing="15">
+                        <Label Text="Your Friendliness"
+                               TextColor="{StaticResource TextSecondary}"
+                               FontSize="14"/>
+                        
+                        <!-- Friendliness Labels -->
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <Label Text="Evil"
+                                   TextColor="#FF6B6B"
+                                   FontSize="12"
+                                   FontAttributes="Bold"/>
+                            <Label x:Name="FriendlinessValueLabel"
+                                   Grid.Column="1"
+                                   Text="Neutral"
+                                   TextColor="{StaticResource TextPrimary}"
+                                   FontSize="16"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"/>
+                            <Label Text="Kind"
+                                   Grid.Column="2"
+                                   TextColor="#00D09E"
+                                   FontSize="12"
+                                   FontAttributes="Bold"/>
+                        </Grid>
+                        
+                        <!-- Friendliness Progress Bar -->
+                        <Grid HeightRequest="12">
+                            <!-- Background gradient bar -->
+                            <Border StrokeShape="RoundRectangle 6"
+                                    Stroke="Transparent">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                        <GradientStop Color="#FF6B6B" Offset="0.0"/>
+                                        <GradientStop Color="#FFE66D" Offset="0.5"/>
+                                        <GradientStop Color="#00D09E" Offset="1.0"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            
+                            <!-- Indicator -->
+                            <Border x:Name="FriendlinessIndicator"
+                                    BackgroundColor="White"
+                                    StrokeShape="RoundRectangle 8"
+                                    Stroke="#333333"
+                                    StrokeThickness="2"
+                                    HeightRequest="16"
+                                    WidthRequest="16"
+                                    VerticalOptions="Center"
+                                    HorizontalOptions="Start"
+                                    Margin="0,0,0,0">
+                                <Border.Shadow>
+                                    <Shadow Brush="Black" Offset="0,2" Radius="4" Opacity="0.3"/>
+                                </Border.Shadow>
+                            </Border>
+                        </Grid>
+                        
+                        <!-- Messages analyzed -->
+                        <Label x:Name="MessagesAnalyzedLabel"
+                               Text="Based on 0 messages"
+                               TextColor="{StaticResource TextMuted}"
+                               FontSize="11"
+                               HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+                </Border>
+
                 <!-- Nickname Input -->
                 <Border BackgroundColor="{StaticResource BackgroundCard}"
                         StrokeShape="RoundRectangle 20"

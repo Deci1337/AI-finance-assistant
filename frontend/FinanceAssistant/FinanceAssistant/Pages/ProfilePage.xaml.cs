@@ -42,6 +42,64 @@ namespace FinanceAssistant.Pages
             TotalTransactionsLabel.Text = transactions.Count.ToString();
             TotalCategoriesLabel.Text = categories.Count.ToString();
             MemberSinceLabel.Text = _profile.CreatedAt.ToString("dd MMM yyyy");
+
+            // Friendliness
+            UpdateFriendlinessDisplay(_profile.Friendliness, _profile.MessagesAnalyzed);
+        }
+
+        private void UpdateFriendlinessDisplay(double friendliness, int messagesAnalyzed)
+        {
+            // friendliness is from -1 (evil) to 1 (kind)
+            // Convert to 0-1 range for positioning
+            double normalizedValue = (friendliness + 1) / 2.0;
+            
+            // Update the indicator position
+            // The progress bar width is approximately the parent width minus padding
+            // We'll use a percentage-based margin
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                // Get the parent width (approximate)
+                double barWidth = this.Width - 80; // Account for padding
+                if (barWidth <= 0) barWidth = 300; // Default if not measured yet
+                
+                double indicatorPosition = normalizedValue * (barWidth - 16); // 16 is indicator width
+                FriendlinessIndicator.Margin = new Thickness(indicatorPosition, 0, 0, 0);
+                
+                // Update the text label
+                FriendlinessValueLabel.Text = GetFriendlinessText(friendliness);
+                FriendlinessValueLabel.TextColor = GetFriendlinessColor(friendliness);
+                
+                // Update messages count
+                MessagesAnalyzedLabel.Text = messagesAnalyzed == 0 
+                    ? "Start chatting to measure your friendliness!" 
+                    : $"Based on {messagesAnalyzed} message{(messagesAnalyzed == 1 ? "" : "s")}";
+            });
+        }
+
+        private static string GetFriendlinessText(double friendliness)
+        {
+            return friendliness switch
+            {
+                < -0.7 => "Very Rude",
+                < -0.4 => "Rude",
+                < -0.1 => "Slightly Rude",
+                < 0.1 => "Neutral",
+                < 0.4 => "Friendly",
+                < 0.7 => "Very Friendly",
+                _ => "Super Kind!"
+            };
+        }
+
+        private static Color GetFriendlinessColor(double friendliness)
+        {
+            return friendliness switch
+            {
+                < -0.4 => Color.FromArgb("#FF6B6B"), // Red
+                < -0.1 => Color.FromArgb("#FFA07A"), // Light red
+                < 0.1 => Color.FromArgb("#FFE66D"),  // Yellow
+                < 0.4 => Color.FromArgb("#90EE90"),  // Light green
+                _ => Color.FromArgb("#00D09E")       // Green
+            };
         }
 
         private static string FormatCurrency(decimal amount)
