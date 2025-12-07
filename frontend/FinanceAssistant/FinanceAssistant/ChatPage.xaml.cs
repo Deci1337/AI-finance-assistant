@@ -547,34 +547,15 @@ namespace FinanceAssistant
 
                 _isRecording = true;
                 MicrophoneIcon.Text = "⏹";
-                MicrophoneButton.BackgroundColor = Color.FromArgb("#FF6B6B");
-                
-                var statusMessage = CreateBotMessageView("🎤 Запись начата... Говорите. Нажмите 'Готово' в диалоге для завершения.");
-                MessagesContainer.Children.Add(statusMessage);
+                // TODO: Audio recording requires platform-specific implementation
+                // CaptureAudioAsync is not available in MAUI's MediaPicker
+                var notImplementedMessage = CreateBotMessageView("Голосовой ввод пока недоступен. Введите текст вручную.");
+                MessagesContainer.Children.Add(notImplementedMessage);
                 ScrollToBottom();
-
-                // MediaPicker.CaptureAudioAsync открывает системный диалог записи
-                // Пользователь записывает и нажимает "Готово" или "Отмена" в системном диалоге
-                var recording = await MediaPicker.Default.CaptureAudioAsync();
-                
-                // Удаляем статусное сообщение
-                MessagesContainer.Children.Remove(statusMessage);
                 
                 _isRecording = false;
                 MicrophoneIcon.Text = "🎤";
                 MicrophoneButton.BackgroundColor = Color.FromArgb("#21262D");
-
-                if (recording != null)
-                {
-                    await ProcessAudioRecordingAsync(recording);
-                }
-                else
-                {
-                    // Пользователь отменил запись
-                    var cancelMessage = CreateBotMessageView("Запись отменена.");
-                    MessagesContainer.Children.Add(cancelMessage);
-                    ScrollToBottom();
-                }
             }
             catch (Exception ex)
             {

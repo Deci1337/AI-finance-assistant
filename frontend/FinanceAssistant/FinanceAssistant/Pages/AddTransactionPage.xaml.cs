@@ -162,7 +162,7 @@ namespace FinanceAssistant.Pages
 
         private async void OnAddCategoryTapped(object? sender, EventArgs e)
         {
-            string? name = await DisplayPromptAsync("New Category", "Enter category name:", "Add", "Cancel");
+            string? name = await DisplayPromptAsync("Новая категория", "Введите название категории:", "Добавить", "Отмена");
             
             if (string.IsNullOrWhiteSpace(name))
                 return;
@@ -193,13 +193,13 @@ namespace FinanceAssistant.Pages
         {
             if (!decimal.TryParse(AmountEntry.Text, out decimal amount) || amount <= 0)
             {
-                await DisplayAlert("Error", "Please enter a valid amount", "OK");
+                await DisplayAlert("Ошибка", "Введите корректную сумму", "ОК");
                 return;
             }
 
             if (_selectedCategory == null)
             {
-                await DisplayAlert("Error", "Please select a category", "OK");
+                await DisplayAlert("Ошибка", "Выберите категорию", "ОК");
                 return;
             }
 

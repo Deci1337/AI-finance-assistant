@@ -26,7 +26,7 @@
             </Border>
             
             <Label Grid.Column="1"
-                   Text="Add Transaction"
+                   Text="Добавить транзакцию"
                    TextColor="{StaticResource TextPrimary}"
                    FontSize="20"
                    FontAttributes="Bold"
@@ -52,7 +52,7 @@
                             <Border.GestureRecognizers>
                                 <TapGestureRecognizer Tapped="OnExpenseTabTapped"/>
                             </Border.GestureRecognizers>
-                            <Label Text="Expense"
+                            <Label Text="Расход"
                                    TextColor="{StaticResource TextPrimary}"
                                    FontSize="16"
                                    FontAttributes="Bold"
@@ -69,7 +69,7 @@
                                 <TapGestureRecognizer Tapped="OnIncomeTabTapped"/>
                             </Border.GestureRecognizers>
                             <Label x:Name="IncomeTabLabel"
-                                   Text="Income"
+                                   Text="Доход"
                                    TextColor="{StaticResource TextSecondary}"
                                    FontSize="16"
                                    HorizontalOptions="Center"/>
@@ -83,7 +83,7 @@
                         Stroke="Transparent"
                         Padding="20">
                     <VerticalStackLayout Spacing="10">
-                        <Label Text="Amount"
+                        <Label Text="Сумма"
                                TextColor="{StaticResource TextSecondary}"
                                FontSize="14"/>
                         <Grid ColumnDefinitions="Auto,*,Auto">
@@ -113,11 +113,11 @@
                         Stroke="Transparent"
                         Padding="20">
                     <VerticalStackLayout Spacing="10">
-                        <Label Text="Title (optional)"
+                        <Label Text="Название (необязательно)"
                                TextColor="{StaticResource TextSecondary}"
                                FontSize="14"/>
                         <Entry x:Name="TitleEntry"
-                               Placeholder="Enter description..."
+                               Placeholder="Введите описание..."
                                PlaceholderColor="{StaticResource TextMuted}"
                                TextColor="{StaticResource TextPrimary}"
                                FontSize="16"
@@ -132,11 +132,11 @@
                         Padding="20">
                     <VerticalStackLayout Spacing="15">
                         <Grid ColumnDefinitions="*,Auto">
-                            <Label Text="Category"
+                            <Label Text="Категория"
                                    TextColor="{StaticResource TextSecondary}"
                                    FontSize="14"/>
                             <Label Grid.Column="1"
-                                   Text="+ Add New"
+                                   Text="+ Добавить"
                                    TextColor="{StaticResource Primary}"
                                    FontSize="14">
                                 <Label.GestureRecognizers>
@@ -160,7 +160,7 @@
                         Stroke="Transparent"
                         Padding="20">
                     <VerticalStackLayout Spacing="15">
-                        <Label Text="Importance"
+                        <Label Text="Важность"
                                TextColor="{StaticResource TextSecondary}"
                                FontSize="14"/>
                         
@@ -174,7 +174,7 @@
                                     <TapGestureRecognizer Tapped="OnImportanceTapped" CommandParameter="0"/>
                                 </Border.GestureRecognizers>
                                 <VerticalStackLayout Spacing="5">
-                                    <Label Text="Low"
+                                    <Label Text="Низкая"
                                            TextColor="{StaticResource TextSecondary}"
                                            FontSize="12"
                                            HorizontalOptions="Center"/>
@@ -191,7 +191,7 @@
                                     <TapGestureRecognizer Tapped="OnImportanceTapped" CommandParameter="1"/>
                                 </Border.GestureRecognizers>
                                 <VerticalStackLayout Spacing="5">
-                                    <Label Text="Medium"
+                                    <Label Text="Средняя"
                                            TextColor="{StaticResource BackgroundDark}"
                                            FontSize="12"
                                            FontAttributes="Bold"
@@ -209,7 +209,7 @@
                                     <TapGestureRecognizer Tapped="OnImportanceTapped" CommandParameter="2"/>
                                 </Border.GestureRecognizers>
                                 <VerticalStackLayout Spacing="5">
-                                    <Label Text="High"
+                                    <Label Text="Высокая"
                                            TextColor="{StaticResource TextSecondary}"
                                            FontSize="12"
                                            HorizontalOptions="Center"/>
@@ -226,7 +226,7 @@
                                     <TapGestureRecognizer Tapped="OnImportanceTapped" CommandParameter="3"/>
                                 </Border.GestureRecognizers>
                                 <VerticalStackLayout Spacing="5">
-                                    <Label Text="Critical"
+                                    <Label Text="Крит."
                                            TextColor="{StaticResource TextSecondary}"
                                            FontSize="12"
                                            HorizontalOptions="Center"/>
@@ -257,7 +257,7 @@
             <Border.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnSaveTapped"/>
             </Border.GestureRecognizers>
-            <Label Text="Save Transaction"
+            <Label Text="Сохранить"
                    TextColor="{StaticResource BackgroundDark}"
                    FontSize="18"
                    FontAttributes="Bold"

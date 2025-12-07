@@ -71,8 +71,8 @@ namespace FinanceAssistant.Pages
                 
                 // Update messages count
                 MessagesAnalyzedLabel.Text = messagesAnalyzed == 0 
-                    ? "Start chatting to measure your friendliness!" 
-                    : $"Based on {messagesAnalyzed} message{(messagesAnalyzed == 1 ? "" : "s")}";
+                    ? "Начни общаться, чтобы измерить дружелюбность!" 
+                    : $"На основе {messagesAnalyzed} сообщений";
             });
         }
 
@@ -80,13 +80,13 @@ namespace FinanceAssistant.Pages
         {
             return friendliness switch
             {
-                < -0.7 => "Very Rude",
-                < -0.4 => "Rude",
-                < -0.1 => "Slightly Rude",
-                < 0.1 => "Neutral",
-                < 0.4 => "Friendly",
-                < 0.7 => "Very Friendly",
-                _ => "Super Kind!"
+                < -0.7 => "Очень грубый",
+                < -0.4 => "Грубый",
+                < -0.1 => "Немного грубый",
+                < 0.1 => "Нейтрально",
+                < 0.4 => "Дружелюбный",
+                < 0.7 => "Очень дружелюбный",
+                _ => "Супер добрый!"
             };
         }
 
@@ -123,7 +123,7 @@ namespace FinanceAssistant.Pages
             _profile.AvatarInitial = _profile.Name.Length > 0 ? _profile.Name[0].ToString().ToUpper() : "U";
 
             await _databaseService.SaveUserProfileAsync(_profile);
-            await DisplayAlert("Success", "Profile saved!", "OK");
+            await DisplayAlert("Успех", "Профиль сохранен!", "ОК");
         }
 
         private async void OnBackTapped(object? sender, EventArgs e)
@@ -134,42 +134,42 @@ namespace FinanceAssistant.Pages
         private async void OnGenerateTestDataTapped(object? sender, EventArgs e)
         {
             bool confirm = await DisplayAlert(
-                "Generate Test Data",
-                "This will add random transactions for November and December 2024. Continue?",
-                "Yes", "Cancel");
+                "Генерация тестовых данных",
+                "Будут добавлены случайные транзакции за последние 60 дней. Продолжить?",
+                "Да", "Отмена");
             
             if (!confirm) return;
             
             try
             {
                 int count = await _databaseService.SeedTestDataAsync();
-                await DisplayAlert("Success", $"Added {count} test transactions!", "OK");
+                await DisplayAlert("Успех", $"Добавлено {count} тестовых транзакций!", "ОК");
                 await LoadProfileAsync();
             }
             catch (Exception ex)
             {
-                await DisplayAlert("Error", $"Failed to generate data: {ex.Message}", "OK");
+                await DisplayAlert("Ошибка", $"Не удалось сгенерировать данные: {ex.Message}", "ОК");
             }
         }
 
         private async void OnClearDataTapped(object? sender, EventArgs e)
         {
             bool confirm = await DisplayAlert(
-                "Clear All Data",
-                "This will delete ALL transactions. This cannot be undone. Continue?",
-                "Delete All", "Cancel");
+                "Очистить все данные",
+                "Все транзакции будут удалены. Это действие нельзя отменить. Продолжить?",
+                "Удалить все", "Отмена");
             
             if (!confirm) return;
             
             try
             {
                 await _databaseService.ClearAllTransactionsAsync();
-                await DisplayAlert("Success", "All transactions deleted!", "OK");
+                await DisplayAlert("Успех", "Все транзакции удалены!", "ОК");
                 await LoadProfileAsync();
             }
             catch (Exception ex)
             {
-                await DisplayAlert("Error", $"Failed to clear data: {ex.Message}", "OK");
+                await DisplayAlert("Ошибка", $"Не удалось очистить данные: {ex.Message}", "ОК");
             }
         }
     }

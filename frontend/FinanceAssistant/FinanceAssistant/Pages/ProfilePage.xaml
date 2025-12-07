@@ -25,7 +25,7 @@
             </Border>
             
             <Label Grid.Column="1"
-                   Text="Profile"
+                   Text="Профиль"
                    TextColor="{StaticResource TextPrimary}"
                    FontSize="20"
                    FontAttributes="Bold"
@@ -69,24 +69,24 @@
                         Stroke="Transparent"
                         Padding="20">
                     <VerticalStackLayout Spacing="15">
-                        <Label Text="Your Friendliness"
+                        <Label Text="Ваша дружелюбность"
                                TextColor="{StaticResource TextSecondary}"
                                FontSize="14"/>
                         
                         <!-- Friendliness Labels -->
                         <Grid ColumnDefinitions="Auto,*,Auto">
-                            <Label Text="Evil"
+                            <Label Text="Злой"
                                    TextColor="#FF6B6B"
                                    FontSize="12"
                                    FontAttributes="Bold"/>
                             <Label x:Name="FriendlinessValueLabel"
                                    Grid.Column="1"
-                                   Text="Neutral"
+                                   Text="Нейтрально"
                                    TextColor="{StaticResource TextPrimary}"
                                    FontSize="16"
                                    FontAttributes="Bold"
                                    HorizontalOptions="Center"/>
-                            <Label Text="Kind"
+                            <Label Text="Добрый"
                                    Grid.Column="2"
                                    TextColor="#00D09E"
                                    FontSize="12"
@@ -126,7 +126,7 @@
                         
                         <!-- Messages analyzed -->
                         <Label x:Name="MessagesAnalyzedLabel"
-                               Text="Based on 0 messages"
+                               Text="На основе 0 сообщений"
                                TextColor="{StaticResource TextMuted}"
                                FontSize="11"
                                HorizontalOptions="Center"/>
@@ -139,11 +139,11 @@
                         Stroke="Transparent"
                         Padding="20">
                     <VerticalStackLayout Spacing="10">
-                        <Label Text="Nickname"
+                        <Label Text="Никнейм"
                                TextColor="{StaticResource TextSecondary}"
                                FontSize="14"/>
                         <Entry x:Name="NicknameEntry"
-                               Placeholder="Enter your nickname"
+                               Placeholder="Введите ваш никнейм"
                                PlaceholderColor="{StaticResource TextMuted}"
                                TextColor="{StaticResource TextPrimary}"
                                FontSize="16"
@@ -174,7 +174,7 @@
                                        HorizontalOptions="Center"
                                        VerticalOptions="Center"/>
                             </Border>
-                            <Label Text="Total Earned"
+                            <Label Text="Всего получено"
                                    TextColor="{StaticResource TextSecondary}"
                                    FontSize="12"/>
                             <Label x:Name="TotalEarnedLabel"
@@ -206,7 +206,7 @@
                                        HorizontalOptions="Center"
                                        VerticalOptions="Center"/>
                             </Border>
-                            <Label Text="Total Spent"
+                            <Label Text="Всего потрачено"
                                    TextColor="{StaticResource TextSecondary}"
                                    FontSize="12"/>
                             <Label x:Name="TotalSpentLabel"
@@ -238,7 +238,7 @@
                                    VerticalOptions="Center"/>
                         </Border>
                         <VerticalStackLayout VerticalOptions="Center">
-                            <Label Text="Current Balance"
+                            <Label Text="Текущий баланс"
                                    TextColor="{StaticResource TextSecondary}"
                                    FontSize="14"/>
                             <Label x:Name="BalanceLabel"
@@ -256,7 +256,7 @@
                         Stroke="Transparent"
                         Padding="20">
                     <VerticalStackLayout Spacing="15">
-                        <Label Text="Account Info"
+                        <Label Text="Информация об аккаунте"
                                TextColor="{StaticResource TextSecondary}"
                                FontSize="14"/>
                         
@@ -267,7 +267,7 @@
                                        TextColor="{StaticResource TextPrimary}"
                                        FontSize="24"
                                        FontAttributes="Bold"/>
-                                <Label Text="Transactions"
+                                <Label Text="Транзакций"
                                        TextColor="{StaticResource TextSecondary}"
                                        FontSize="12"/>
                             </VerticalStackLayout>
@@ -278,7 +278,7 @@
                                        TextColor="{StaticResource TextPrimary}"
                                        FontSize="24"
                                        FontAttributes="Bold"/>
-                                <Label Text="Categories"
+                                <Label Text="Категорий"
                                        TextColor="{StaticResource TextSecondary}"
                                        FontSize="12"/>
                             </VerticalStackLayout>
@@ -289,7 +289,7 @@
                                        TextColor="{StaticResource TextPrimary}"
                                        FontSize="16"
                                        FontAttributes="Bold"/>
-                                <Label Text="Member Since"
+                                <Label Text="Дата регистрации"
                                        TextColor="{StaticResource TextSecondary}"
                                        FontSize="12"/>
                             </VerticalStackLayout>
@@ -311,7 +311,7 @@
                     <Border.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnSaveTapped"/>
                     </Border.GestureRecognizers>
-                    <Label Text="Save Changes"
+                    <Label Text="Сохранить"
                            TextColor="{StaticResource BackgroundDark}"
                            FontSize="18"
                            FontAttributes="Bold"
@@ -324,7 +324,7 @@
                         Stroke="Transparent"
                         Padding="20">
                     <VerticalStackLayout Spacing="15">
-                        <Label Text="Developer Tools"
+                        <Label Text="Инструменты разработчика"
                                TextColor="{StaticResource TextSecondary}"
                                FontSize="14"/>
                         
@@ -337,7 +337,7 @@
                                 <Border.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="OnGenerateTestDataTapped"/>
                                 </Border.GestureRecognizers>
-                                <Label Text="+ Test Data"
+                                <Label Text="+ Тест данные"
                                        TextColor="{StaticResource TextPrimary}"
                                        FontSize="14"
                                        FontAttributes="Bold"
@@ -353,7 +353,7 @@
                                 <Border.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="OnClearDataTapped"/>
                                 </Border.GestureRecognizers>
-                                <Label Text="Clear Data"
+                                <Label Text="Очистить"
                                        TextColor="{StaticResource TextPrimary}"
                                        FontSize="14"
                                        FontAttributes="Bold"

@@ -123,7 +123,7 @@ namespace FinanceAssistant.Pages
             {
                 var emptyLabel = new Label
                 {
-                    Text = "No expenses in this period",
+                    Text = "Нет расходов за этот период",
                     TextColor = Color.FromArgb("#8B949E"),
                     FontSize = 14
                 };
@@ -188,7 +188,7 @@ namespace FinanceAssistant.Pages
 
                 var countLabel = new Label
                 {
-                    Text = $"{stat.Count} transactions",
+                    Text = $"{stat.Count} транзакций",
                     TextColor = Color.FromArgb("#8B949E"),
                     FontSize = 12
                 };

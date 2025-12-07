@@ -25,7 +25,7 @@
             </Border>
             
             <Label Grid.Column="1"
-                   Text="AI Assistant"
+                   Text="ИИ Ассистент"
                    TextColor="{StaticResource TextPrimary}"
                    FontSize="20"
                    FontAttributes="Bold"
@@ -50,11 +50,11 @@
                         HorizontalOptions="Start"
                         MaximumWidthRequest="300">
                     <VerticalStackLayout Spacing="5">
-                        <Label Text="AI Assistant"
+                        <Label Text="ИИ Ассистент"
                                TextColor="{StaticResource Primary}"
                                FontSize="12"
                                FontAttributes="Bold"/>
-                        <Label Text="Hello! I'm your personal finance assistant. I can help you analyze your spending, give advice on budgeting, and answer questions about your finances. How can I help you today?"
+                        <Label Text="Привет! Я твой финансовый ассистент. Могу помочь с анализом расходов, дать советы по бюджету и ответить на вопросы о финансах. Чем могу помочь?"
                                TextColor="{StaticResource TextPrimary}"
                                FontSize="14"
                                LineBreakMode="WordWrap"/>
@@ -74,7 +74,7 @@
                         Stroke="Transparent"
                         Padding="15,10">
                     <Entry x:Name="MessageEntry"
-                           Placeholder="Type a message..."
+                           Placeholder="Введите сообщение..."
                            PlaceholderColor="{StaticResource TextMuted}"
                            TextColor="{StaticResource TextPrimary}"
                            FontSize="16"

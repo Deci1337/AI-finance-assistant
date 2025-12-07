@@ -29,14 +29,14 @@ namespace FinanceAssistant
             var profile = await _databaseService.GetUserProfileAsync();
             var transactions = await _databaseService.GetRecentTransactionsAsync(5);
             var chartData = await _databaseService.GetChartDataAsync(7);
-            var balance = await _databaseService.GetTotalBalanceAsync();
-            var (monthlyIncome, monthlyExpense) = await _databaseService.GetMonthlyTotalsAsync();
+            var (totalIncome, totalExpense) = await _databaseService.GetTotalStatsAsync();
+            var balance = totalIncome - totalExpense;
 
             // Update profile
             UserNameLabel.Text = profile.Name;
             BalanceLabel.Text = FormatCurrency(balance);
-            IncomeLabel.Text = $"+{FormatCurrency(monthlyIncome)}";
-            ExpenseLabel.Text = $"-{FormatCurrency(monthlyExpense)}";
+            IncomeLabel.Text = $"+{FormatCurrency(totalIncome)}";
+            ExpenseLabel.Text = $"-{FormatCurrency(totalExpense)}";
 
             // Update chart
             _chartDrawable.DataPoints = chartData;
@@ -54,7 +54,7 @@ namespace FinanceAssistant
             {
                 var emptyLabel = new Label
                 {
-                    Text = "No transactions yet. Tap + to add one!",
+                    Text = "Пока нет транзакций. Нажми + чтобы добавить!",
                     TextColor = Color.FromArgb("#8B949E"),
                     FontSize = 14,
                     HorizontalOptions = LayoutOptions.Center,
@@ -172,11 +172,11 @@ namespace FinanceAssistant
         {
             return importance switch
             {
-                ImportanceLevel.Low => "Low",
-                ImportanceLevel.Medium => "Med",
-                ImportanceLevel.High => "High",
-                ImportanceLevel.Critical => "Crit",
-                _ => "Med"
+                ImportanceLevel.Low => "Низк",
+                ImportanceLevel.Medium => "Сред",
+                ImportanceLevel.High => "Выс",
+                ImportanceLevel.Critical => "Крит",
+                _ => "Сред"
             };
         }
 

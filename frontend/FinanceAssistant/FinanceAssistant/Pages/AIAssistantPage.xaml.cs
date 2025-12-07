@@ -44,7 +44,7 @@ namespace FinanceAssistant.Pages
                 else
                 {
                     AddSystemMessage("Сервер не найден!");
-                    AddSystemMessage("Нажми на 'AI Assistant' вверху для настройки");
+                    AddSystemMessage("Нажми на 'ИИ Ассистент' вверху для настройки");
                 }
             }
             else
@@ -153,7 +153,7 @@ namespace FinanceAssistant.Pages
 
             var nameLabel = new Label
             {
-                Text = "AI Assistant",
+                Text = "ИИ Ассистент",
                 TextColor = Color.FromArgb("#00D09E"),
                 FontSize = 12,
                 FontAttributes = FontAttributes.Bold
@@ -205,13 +205,13 @@ namespace FinanceAssistant.Pages
             if (_isRecording)
             {
                 MicButton.BackgroundColor = Color.FromArgb("#FF4444");
-                MicIcon.Text = "STOP";
+                MicIcon.Text = "СТОП";
                 MicIcon.TextColor = Colors.White;
             }
             else
             {
                 MicButton.BackgroundColor = Color.FromArgb("#21262D");
-                MicIcon.Text = "MIC";
+                MicIcon.Text = "МИК";
                 MicIcon.TextColor = Color.FromArgb("#E6EDF3");
             }
         }
@@ -219,19 +219,19 @@ namespace FinanceAssistant.Pages
         private void StartRecording()
         {
             _audioStream = new MemoryStream();
-            AddSystemMessage("Recording...");
+            AddSystemMessage("Запись...");
             // TODO: Implement actual audio recording with platform-specific code
         }
 
         private void StopRecording()
         {
-            AddSystemMessage("Recording stopped");
+            AddSystemMessage("Запись остановлена");
             
             if (_audioStream != null && _audioStream.Length > 0)
             {
                 // TODO: Send audio to backend for speech-to-text
                 // For now just show that we have audio data
-                AddSystemMessage($"Audio captured: {_audioStream.Length} bytes");
+                AddSystemMessage($"Аудио записано: {_audioStream.Length} байт");
             }
             
             _audioStream?.Dispose();
@@ -340,7 +340,7 @@ namespace FinanceAssistant.Pages
             
             var nameLabel = new Label
             {
-                Text = "AI Assistant",
+                Text = "ИИ Ассистент",
                 TextColor = Color.FromArgb("#00D09E"),
                 FontSize = 12,
                 FontAttributes = FontAttributes.Bold
