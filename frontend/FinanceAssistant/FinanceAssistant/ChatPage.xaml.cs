@@ -4,6 +4,7 @@ using FinanceAssistant.Services;
 using Microsoft.Maui.Controls.Shapes;
 using System.Text.RegularExpressions;
 using Microsoft.Maui.Media;
+using Plugin.Maui.Audio;
 
 namespace FinanceAssistant
 {
@@ -11,22 +12,61 @@ namespace FinanceAssistant
     {
         private readonly FinanceService _financeService;
         private readonly DatabaseService _databaseService;
+        private readonly IAudioManager _audioManager;
+        private IAudioRecorder? _audioRecorder;
         private bool _isRecording = false;
-        private string? _currentAudioPath = null;
+        private View? _recordingStatusMessage = null;
 
         public ChatPage(FinanceService financeService, DatabaseService databaseService)
         {
             InitializeComponent();
             _financeService = financeService;
             _databaseService = databaseService;
+            _audioManager = AudioManager.Current;
             
             AddWelcomeMessage();
+            UpdateConnectionStatus($"Сервер: {_financeService.GetCurrentServerUrl()}", false);
         }
 
-        protected override void OnAppearing()
+        protected override async void OnAppearing()
         {
             base.OnAppearing();
+            await CheckAndConnectToServerAsync();
             ScrollToBottom();
+        }
+
+        private async Task CheckAndConnectToServerAsync()
+        {
+            // Проверяем текущее подключение
+            var isHealthy = await _financeService.CheckHealthAsync();
+            
+            if (!isHealthy)
+            {
+                UpdateConnectionStatus("Поиск сервера...", false);
+                
+                // Пробуем найти работающий сервер
+                var (found, url) = await _financeService.FindWorkingServerAsync();
+                
+                if (found)
+                {
+                    UpdateConnectionStatus($"Сервер: {url}", true);
+                }
+                else
+                {
+                    UpdateConnectionStatus("Сервер не найден", false);
+                }
+            }
+            else
+            {
+                UpdateConnectionStatus($"Сервер: {_financeService.GetCurrentServerUrl()}", true);
+            }
+        }
+
+        private void UpdateConnectionStatus(string status, bool isConnected)
+        {
+            ConnectionStatusLabel.Text = status;
+            ConnectionIndicator.Text = isConnected ? "●" : "○";
+            ConnectionIndicator.TextColor = isConnected ? Color.FromArgb("#00D09E") : Color.FromArgb("#FF6B6B");
         }
 
         private async void OnBackTapped(object? sender, EventArgs e)
@@ -51,6 +91,7 @@ namespace FinanceAssistant
                 "Отмена", 
                 null, 
                 "Ввести IP адрес", 
+                "Поиск сервера",
                 "Использовать localhost (Windows)",
                 "Использовать 10.0.2.2 (Android эмулятор)",
                 "Как узнать IP компьютера?"
@@ -74,19 +115,26 @@ namespace FinanceAssistant
                     if (!ip.Contains(":8000"))
                         ip = $"{ip}:8000";
                     
-                    Preferences.Set("api_base_url", ip);
-                    await DisplayAlert("Готово", $"Адрес сервера: {ip}\n\nПерезапустите чат для применения.", "OK");
+                    _financeService.SetServerUrl(ip);
+                    await DisplayAlert("Готово", $"Адрес сервера: {ip}", "OK");
+                    await CheckAndConnectToServerAsync();
                 }
             }
             else if (action == "Использовать localhost (Windows)")
             {
-                Preferences.Set("api_base_url", "http://localhost:8000");
+                _financeService.SetServerUrl("http://localhost:8000");
                 await DisplayAlert("Готово", "Установлен localhost:8000", "OK");
+                await CheckAndConnectToServerAsync();
             }
             else if (action == "Использовать 10.0.2.2 (Android эмулятор)")
             {
-                Preferences.Set("api_base_url", "http://10.0.2.2:8000");
+                _financeService.SetServerUrl("http://10.0.2.2:8000");
                 await DisplayAlert("Готово", "Установлен 10.0.2.2:8000", "OK");
+                await CheckAndConnectToServerAsync();
+            }
+            else if (action == "Поиск сервера")
+            {
+                await CheckAndConnectToServerAsync();
             }
             else if (action == "Как узнать IP компьютера?")
             {
@@ -528,14 +576,6 @@ namespace FinanceAssistant
 
         private async void OnMicrophoneTapped(object? sender, EventArgs e)
         {
-            if (_isRecording)
-            {
-                // Второе нажатие - пытаемся остановить запись
-                // MediaPicker управляет записью через системный диалог,
-                // поэтому просто показываем подсказку
-                return;
-            }
-
             try
             {
                 var status = await Permissions.RequestAsync<Permissions.Microphone>();
@@ -545,17 +585,42 @@ namespace FinanceAssistant
                     return;
                 }
 
-                _isRecording = true;
-                MicrophoneIcon.Text = "⏹";
-                // TODO: Audio recording requires platform-specific implementation
-                // CaptureAudioAsync is not available in MAUI's MediaPicker
-                var notImplementedMessage = CreateBotMessageView("Голосовой ввод пока недоступен. Введите текст вручную.");
-                MessagesContainer.Children.Add(notImplementedMessage);
-                ScrollToBottom();
-                
-                _isRecording = false;
-                MicrophoneIcon.Text = "🎤";
-                MicrophoneButton.BackgroundColor = Color.FromArgb("#21262D");
+                if (!_isRecording)
+                {
+                    // Start recording
+                    _audioRecorder = _audioManager.CreateRecorder();
+                    await _audioRecorder.StartAsync();
+                    
+                    _isRecording = true;
+                    MicrophoneIcon.Text = "⏹";
+                    MicrophoneButton.BackgroundColor = Color.FromArgb("#FF6B6B");
+                    
+                    _recordingStatusMessage = CreateBotMessageView("🎤 Запись... Нажмите еще раз для остановки.");
+                    MessagesContainer.Children.Add(_recordingStatusMessage);
+                    ScrollToBottom();
+                }
+                else
+                {
+                    // Stop recording
+                    if (_audioRecorder != null)
+                    {
+                        var recording = await _audioRecorder.StopAsync();
+                        
+                        _isRecording = false;
+                        MicrophoneIcon.Text = "🎤";
+                        MicrophoneButton.BackgroundColor = Color.FromArgb("#21262D");
+                        
+                        // Remove status message
+                        if (_recordingStatusMessage != null)
+                        {
+                            MessagesContainer.Children.Remove(_recordingStatusMessage);
+                            _recordingStatusMessage = null;
+                        }
+                        
+                        // Process the recording
+                        await ProcessAudioStreamAsync(recording);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -564,6 +629,52 @@ namespace FinanceAssistant
                 MicrophoneButton.BackgroundColor = Color.FromArgb("#21262D");
                 
                 var errorMessage = CreateBotMessageView($"❌ Ошибка записи: {ex.Message}");
+                MessagesContainer.Children.Add(errorMessage);
+                ScrollToBottom();
+            }
+        }
+
+        private async Task ProcessAudioStreamAsync(IAudioSource audioSource)
+        {
+            try
+            {
+                var statusMessage = CreateBotMessageView("🔄 Обработка аудио...");
+                MessagesContainer.Children.Add(statusMessage);
+                ScrollToBottom();
+
+                // Get the audio stream
+                var audioStream = audioSource.GetAudioStream();
+                var transcriptionResult = await _financeService.TranscribeAudioAsync(audioStream, "recording.wav");
+
+                // Remove status message
+                MessagesContainer.Children.Remove(statusMessage);
+
+                if (!string.IsNullOrEmpty(transcriptionResult.Error))
+                {
+                    var errorMessage = CreateBotMessageView($"❌ Ошибка: {transcriptionResult.Error}");
+                    MessagesContainer.Children.Add(errorMessage);
+                    ScrollToBottom();
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(transcriptionResult.Text))
+                {
+                    var errorMessage = CreateBotMessageView("❌ Не удалось распознать речь. Попробуйте еще раз.");
+                    MessagesContainer.Children.Add(errorMessage);
+                    ScrollToBottom();
+                    return;
+                }
+
+                // Show transcribed text as user message
+                AddUserMessage(transcriptionResult.Text);
+                ScrollToBottom();
+
+                // Process the transcribed text
+                await ProcessMessageAsync(transcriptionResult.Text);
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = CreateBotMessageView($"❌ Ошибка обработки аудио: {ex.Message}");
                 MessagesContainer.Children.Add(errorMessage);
                 ScrollToBottom();
             }

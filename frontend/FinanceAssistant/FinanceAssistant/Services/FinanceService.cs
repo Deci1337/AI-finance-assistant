@@ -34,6 +34,84 @@ namespace FinanceAssistant.Services
             _apiBaseUrl = GetApiBaseUrl();
         }
 
+        public void SetServerUrl(string url)
+        {
+            _apiBaseUrl = url;
+            Preferences.Set("api_base_url", url);
+        }
+
+        public async Task<bool> CheckHealthAsync()
+        {
+            try
+            {
+                using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromSeconds(3);
+                var response = await client.GetAsync($"{_apiBaseUrl}/health");
+                return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public async Task<(bool success, string url)> FindWorkingServerAsync()
+        {
+            // IP адреса для поиска:
+            // - Мобильный хотспот Android: 192.168.43.x
+            // - Мобильный хотспот iOS: 172.20.10.x  
+            // - Стандартные роутеры: 192.168.0.x, 192.168.1.x
+            // - Android эмулятор: 10.0.2.2
+            
+            var urlsToTry = new List<string>
+            {
+                "http://localhost:8000",
+                "http://127.0.0.1:8000",
+                "http://10.0.2.2:8000",
+            };
+
+            // Добавляем IP для мобильного хотспота (192.168.43.x)
+            for (int i = 1; i <= 20; i++)
+            {
+                urlsToTry.Add($"http://192.168.43.{i}:8000");
+            }
+
+            // iOS hotspot (172.20.10.x)
+            for (int i = 1; i <= 15; i++)
+            {
+                urlsToTry.Add($"http://172.20.10.{i}:8000");
+            }
+
+            // Стандартные сети
+            for (int i = 1; i <= 10; i++)
+            {
+                urlsToTry.Add($"http://192.168.1.{i}:8000");
+                urlsToTry.Add($"http://192.168.0.{i}:8000");
+            }
+
+            foreach (var url in urlsToTry)
+            {
+                try
+                {
+                    using var client = new HttpClient();
+                    client.Timeout = TimeSpan.FromSeconds(2);
+                    var response = await client.GetAsync($"{url}/health");
+                    
+                    if (response.IsSuccessStatusCode)
+                    {
+                        SetServerUrl(url);
+                        return (true, url);
+                    }
+                }
+                catch
+                {
+                    // Continue to next URL
+                }
+            }
+
+            return (false, string.Empty);
+        }
+
         public async Task<TransactionExtractionResult> ExtractTransactionsFromMessageAsync(string message, string? context = null)
         {
             try
