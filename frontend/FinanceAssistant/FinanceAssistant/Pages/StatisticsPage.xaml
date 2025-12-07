@@ -182,19 +182,19 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- Pie Chart - Expenses by Category -->
+                <!-- Radar Chart - Category Comparison -->
                 <Border BackgroundColor="{StaticResource BackgroundCard}"
                         StrokeShape="RoundRectangle 20"
                         Stroke="Transparent"
                         Padding="15">
                     <VerticalStackLayout Spacing="15">
-                        <Label Text="Expenses by Category"
+                        <Label Text="Category Comparison"
                                TextColor="{StaticResource TextPrimary}"
                                FontSize="18"
                                FontAttributes="Bold"/>
                         
-                        <GraphicsView x:Name="PieChartView"
-                                      HeightRequest="200"
+                        <GraphicsView x:Name="RadarChartView"
+                                      HeightRequest="280"
                                       BackgroundColor="Transparent"/>
                         
                         <!-- Category Legend -->

@@ -7,7 +7,7 @@ namespace FinanceAssistant.Pages
     public partial class StatisticsPage : ContentPage
     {
         private readonly DatabaseService _databaseService;
-        private readonly PieChartDrawable _pieChartDrawable;
+        private readonly RadarChartDrawable _radarChartDrawable;
         private readonly BarChartDrawable _barChartDrawable;
         private int _currentPeriod = 7;
 
@@ -16,10 +16,10 @@ namespace FinanceAssistant.Pages
             InitializeComponent();
             _databaseService = databaseService;
             
-            _pieChartDrawable = new PieChartDrawable();
+            _radarChartDrawable = new RadarChartDrawable();
             _barChartDrawable = new BarChartDrawable();
             
-            PieChartView.Drawable = _pieChartDrawable;
+            RadarChartView.Drawable = _radarChartDrawable;
             BarChartView.Drawable = _barChartDrawable;
         }
 
@@ -32,26 +32,28 @@ namespace FinanceAssistant.Pages
         private async Task LoadDataAsync()
         {
             var (income, expense) = await _databaseService.GetStatsForPeriodAsync(_currentPeriod);
-            var categoryStats = await _databaseService.GetCategoryStatsAsync(_currentPeriod, TransactionType.Expense);
+            var expenseStats = await _databaseService.GetCategoryStatsAsync(_currentPeriod, TransactionType.Expense);
+            var incomeStats = await _databaseService.GetCategoryStatsAsync(_currentPeriod, TransactionType.Income);
             var barChartData = await _databaseService.GetBarChartDataAsync(_currentPeriod);
 
             // Update summary
             PeriodIncomeLabel.Text = FormatCurrency(income);
             PeriodExpenseLabel.Text = FormatCurrency(expense);
 
-            // Update pie chart
-            _pieChartDrawable.Data = categoryStats;
-            PieChartView.Invalidate();
+            // Update radar chart with both expense and income data
+            _radarChartDrawable.ExpenseData = expenseStats;
+            _radarChartDrawable.IncomeData = incomeStats;
+            RadarChartView.Invalidate();
 
             // Update bar chart
             _barChartDrawable.Data = barChartData;
             BarChartView.Invalidate();
 
             // Update category legend
-            UpdateCategoryLegend(categoryStats);
+            UpdateCategoryLegend(expenseStats);
 
             // Update top expenses
-            UpdateTopExpenses(categoryStats);
+            UpdateTopExpenses(expenseStats);
         }
 
         private void UpdateCategoryLegend(List<CategoryStats> stats)

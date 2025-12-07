@@ -212,10 +212,196 @@ def test_message_classification():
     print(f"\nРезультат: {passed} пройдено, {failed} провалено из {len(test_cases)}")
 
 
+def test_detailed_analysis():
+    """Тест детального анализа для конкретного сообщения"""
+    print("\n" + "=" * 60)
+    print("ТЕСТ 6: Детальный финансовый анализ")
+    print("=" * 60)
+    
+    test_message = "Купил хлеб за 50 рублей, сникерс за 100 рублей, потом мама отправила 10000 рублей за хорошую учебу"
+    
+    print(f"\nТестовое сообщение: '{test_message}'")
+    print("\nОжидаемые транзакции:")
+    print("  1. Расход: хлеб, 50 руб, категория Food")
+    print("  2. Расход: сникерс, 100 руб, категория Food")
+    print("  3. Доход: от мамы, 10000 руб, категория Gift")
+    print("\nОжидаемый анализ:")
+    print("  - Должен быть развернутым (минимум 8-10 предложений)")
+    print("  - Должен включать оценку транзакций, анализ категорий, рекомендации")
+    print("  - Должен содержать практические советы и прогноз")
+    
+    print("\n" + "-" * 60)
+    print("РЕЗУЛЬТАТЫ ИЗВЛЕЧЕНИЯ:")
+    print("-" * 60)
+    
+    try:
+        result = extract_transactions_with_fallback(test_message)
+        
+        if not result:
+            print("❌ Результат пустой")
+            return False
+        
+        transactions = result.get("transactions", [])
+        extracted_info = result.get("extracted_info", {})
+        analysis = result.get("analysis", "")
+        warnings = result.get("warnings", [])
+        questions = result.get("questions", [])
+        
+        print(f"\n✅ Извлечено транзакций: {len(transactions)}")
+        print(f"   Ожидалось: 3 транзакции (2 расхода + 1 доход)")
+        
+        if len(transactions) != 3:
+            print(f"   ⚠️  Несоответствие: найдено {len(transactions)}, ожидалось 3")
+        
+        print("\n" + "-" * 60)
+        print("ДЕТАЛИ ТРАНЗАКЦИЙ:")
+        print("-" * 60)
+        
+        total_expense = 0
+        total_income = 0
+        
+        for i, trans in enumerate(transactions, 1):
+            trans_type = trans.get('type', 'N/A')
+            amount = trans.get('amount')
+            title = trans.get('title', 'N/A')
+            category = trans.get('category', 'N/A')
+            date = trans.get('date', 'N/A')
+            confidence = trans.get('confidence', 'N/A')
+            
+            print(f"\n  Транзакция {i}:")
+            print(f"    Тип: {trans_type}")
+            print(f"    Название: {title}")
+            print(f"    Сумма: {amount} руб" if amount else "    Сумма: не указана")
+            print(f"    Категория: {category}")
+            print(f"    Дата: {date}")
+            print(f"    Уверенность: {confidence}")
+            
+            if trans_type == "expense" and amount:
+                total_expense += amount
+            elif trans_type == "income" and amount:
+                total_income += amount
+        
+        print("\n" + "-" * 60)
+        print("СВОДКА:")
+        print("-" * 60)
+        print(f"  Всего расходов: {total_expense} руб (ожидалось: 150 руб)")
+        print(f"  Всего доходов: {total_income} руб (ожидалось: 10000 руб)")
+        print(f"  Баланс: {total_income - total_expense} руб")
+        
+        if extracted_info:
+            print(f"\n  Извлеченная информация:")
+            print(f"    - Общая сумма доходов: {extracted_info.get('total_income', 'N/A')}")
+            print(f"    - Общая сумма расходов: {extracted_info.get('total_expense', 'N/A')}")
+            print(f"    - Количество транзакций: {extracted_info.get('transactions_count', 'N/A')}")
+        
+        print("\n" + "-" * 60)
+        print("ФИНАНСОВЫЙ АНАЛИЗ:")
+        print("-" * 60)
+        
+        if analysis:
+            print(f"\n{analysis}")
+            print(f"\n  Длина анализа: {len(analysis)} символов")
+            sentences = analysis.count('.') + analysis.count('!') + analysis.count('?')
+            print(f"  Примерное количество предложений: {sentences}")
+            
+            if len(analysis) < 500:
+                print("  ⚠️  Анализ слишком короткий (ожидается минимум 8-10 предложений)")
+            else:
+                print("  ✅ Анализ достаточно развернутый")
+            
+            # Проверка наличия ключевых элементов анализа
+            analysis_lower = analysis.lower()
+            checks = {
+                "оценка": any(word in analysis_lower for word in ["оценка", "сумма", "количество", "тип"]),
+                "категории": any(word in analysis_lower for word in ["категория", "категории", "расход", "доход"]),
+                "рекомендации": any(word in analysis_lower for word in ["рекоменд", "совет", "следует", "стоит"]),
+                "советы": any(word in analysis_lower for word in ["совет", "рекоменд", "можно", "нужно"]),
+            }
+            
+            print("\n  Проверка элементов анализа:")
+            for check_name, passed in checks.items():
+                status = "✅" if passed else "❌"
+                print(f"    {status} {check_name.capitalize()}: {'найдено' if passed else 'не найдено'}")
+        else:
+            print("❌ Анализ отсутствует")
+        
+        if warnings:
+            print("\n" + "-" * 60)
+            print("ПРЕДУПРЕЖДЕНИЯ:")
+            print("-" * 60)
+            for warning in warnings:
+                print(f"  ⚠️  {warning}")
+        
+        if questions:
+            print("\n" + "-" * 60)
+            print("ВОПРОСЫ ДЛЯ УТОЧНЕНИЯ:")
+            print("-" * 60)
+            for question in questions:
+                print(f"  ❓ {question}")
+        
+        print("\n" + "=" * 60)
+        print("ИТОГОВАЯ ОЦЕНКА:")
+        print("=" * 60)
+        
+        score = 0
+        max_score = 7
+        
+        if len(transactions) == 3:
+            score += 1
+            print("✅ Правильное количество транзакций")
+        else:
+            print(f"❌ Неправильное количество транзакций: {len(transactions)} вместо 3")
+        
+        if total_expense == 150:
+            score += 1
+            print("✅ Правильная сумма расходов (150 руб)")
+        else:
+            print(f"⚠️  Сумма расходов: {total_expense} руб (ожидалось 150 руб)")
+        
+        if total_income == 10000:
+            score += 1
+            print("✅ Правильная сумма доходов (10000 руб)")
+        else:
+            print(f"⚠️  Сумма доходов: {total_income} руб (ожидалось 10000 руб)")
+        
+        if analysis and len(analysis) >= 500:
+            score += 1
+            print("✅ Анализ достаточно развернутый")
+        else:
+            print("❌ Анализ слишком короткий")
+        
+        if analysis and any(word in analysis.lower() for word in ["рекоменд", "совет"]):
+            score += 1
+            print("✅ Анализ содержит рекомендации")
+        else:
+            print("❌ Анализ не содержит рекомендаций")
+        
+        if analysis and any(word in analysis.lower() for word in ["категория", "категории"]):
+            score += 1
+            print("✅ Анализ содержит анализ категорий")
+        else:
+            print("❌ Анализ не содержит анализ категорий")
+        
+        if analysis and sentences >= 8:
+            score += 1
+            print(f"✅ Достаточно предложений в анализе ({sentences})")
+        else:
+            print(f"⚠️  Мало предложений в анализе ({sentences}, ожидалось минимум 8)")
+        
+        print(f"\n📊 Оценка: {score}/{max_score} ({score*100//max_score}%)")
+        
+        return score >= 5
+        
+    except Exception as e:
+        print(f"❌ Ошибка при тестировании: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def test_chat_responses():
     """Тест обычных вопросов в чате"""
     print("\n" + "=" * 60)
-    print("ТЕСТ 6: Ответы на обычные вопросы")
+    print("ТЕСТ 7: Ответы на обычные вопросы")
     print("=" * 60)
     
     token = get_access_token()
@@ -269,7 +455,10 @@ def main():
     # Тест 5: Классификация сообщений
     test_message_classification()
     
-    # Тест 6: Ответы на обычные вопросы
+    # Тест 6: Детальный анализ конкретного сообщения
+    test_detailed_analysis()
+    
+    # Тест 7: Ответы на обычные вопросы
     test_chat_responses()
     
     print("\n" + "=" * 60)
