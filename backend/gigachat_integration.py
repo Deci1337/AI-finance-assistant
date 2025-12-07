@@ -14,9 +14,9 @@ from io import BytesIO
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Приоритет моделей: сначала пробуем Lite (экономия токенов), затем Pro
+# Приоритет моделей: Lite как основная модель (экономия токенов), Pro как fallback
 PREFERRED_MODELS = ["GigaChat-Lite", "GigaChat-Pro"]
-MODEL = "GigaChat-Pro"  # По умолчанию используем Pro
+MODEL = "GigaChat-Lite"  # По умолчанию используем Lite как основную модель
 SALUTE_SPEECH_URL = "https://smartspeech.sber.ru/rest/v1/speech:recognize"
 
 # Кэш для проверенных моделей
@@ -68,8 +68,8 @@ def detect_available_model() -> str:
     
     token = get_access_token()
     if not token:
-        print("Warning: Cannot get access token, using default model GigaChat-Pro")
-        _available_model_cache = "GigaChat-Pro"
+        print("Warning: Cannot get access token, using default model GigaChat-Lite")
+        _available_model_cache = "GigaChat-Lite"
         return _available_model_cache
     
     # Пробуем каждую модель из списка приоритетов
@@ -86,12 +86,16 @@ def detect_available_model() -> str:
                 if error_code == 404 or "No such model" in str(error_msg):
                     print(f"Model {model_name} not available, trying next...")
                     continue
-                # Если ошибка оплаты (402), все равно пробуем использовать модель
-                # (возможно, токены закончатся позже)
+                # Если ошибка оплаты (402) для Lite, пробуем Pro как fallback
+                # Если ошибка для Pro, используем его (возможно, токены закончатся позже)
                 elif error_code == 402:
-                    print(f"Warning: Payment required for {model_name}, but model exists")
-                    _available_model_cache = model_name
-                    return model_name
+                    if model_name == "GigaChat-Lite":
+                        print(f"Warning: Payment required for {model_name}, trying Pro as fallback...")
+                        continue  # Пробуем следующую модель (Pro)
+                    else:
+                        print(f"Warning: Payment required for {model_name}, but model exists")
+                        _available_model_cache = model_name
+                        return model_name
                 else:
                     # Другие ошибки - пробуем следующую модель
                     continue
@@ -105,9 +109,9 @@ def detect_available_model() -> str:
             print(f"Error testing model {model_name}: {str(e)}")
             continue
     
-    # Если ни одна модель не работает, используем Pro по умолчанию
-    print("Warning: Could not detect available model, using GigaChat-Pro as default")
-    _available_model_cache = "GigaChat-Pro"
+    # Если ни одна модель не работает, используем Lite по умолчанию (основная модель)
+    print("Warning: Could not detect available model, using GigaChat-Lite as default")
+    _available_model_cache = "GigaChat-Lite"
     return _available_model_cache
 
 
