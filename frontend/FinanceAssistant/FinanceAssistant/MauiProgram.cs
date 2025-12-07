@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using FinanceAssistant.Services;
+using Microsoft.Extensions.Logging;
 
 namespace FinanceAssistant
 {
@@ -15,8 +16,11 @@ namespace FinanceAssistant
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                 });
 
+            // Register services
+            builder.Services.AddSingleton<FinanceService>();
+
 #if DEBUG
-    		builder.Logging.AddDebug();
+            builder.Logging.AddDebug();
 #endif
 
             return builder.Build();
