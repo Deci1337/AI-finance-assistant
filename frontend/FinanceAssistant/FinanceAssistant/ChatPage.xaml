@@ -87,8 +87,29 @@
         <Border Grid.Row="3"
                 BackgroundColor="{StaticResource BackgroundCard}"
                 Padding="15,10">
-            <Grid ColumnDefinitions="*,Auto">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                <!-- Microphone Button -->
+                <Border x:Name="MicrophoneButton"
+                        Grid.Column="0"
+                        BackgroundColor="{StaticResource BackgroundElevated}"
+                        StrokeShape="RoundRectangle 20"
+                        Stroke="Transparent"
+                        HeightRequest="45"
+                        WidthRequest="45"
+                        Margin="0,0,10,0">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnMicrophoneTapped"/>
+                    </Border.GestureRecognizers>
+                    <Label x:Name="MicrophoneIcon"
+                           Text="🎤"
+                           TextColor="{StaticResource TextPrimary}"
+                           FontSize="20"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"/>
+                </Border>
+                
                 <Entry x:Name="MessageEntry"
+                       Grid.Column="1"
                        Placeholder="Купил хлеб за 50 рублей..."
                        PlaceholderColor="{StaticResource TextSecondary}"
                        TextColor="{StaticResource TextPrimary}"
@@ -96,7 +117,7 @@
                        FontSize="14"
                        Completed="OnSendMessage"/>
                 
-                <Button Grid.Column="1"
+                <Button Grid.Column="2"
                         Text=">"
                         BackgroundColor="{StaticResource Primary}"
                         TextColor="{StaticResource BackgroundDark}"

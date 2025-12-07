@@ -3,6 +3,7 @@ using FinanceAssistant.Models;
 using FinanceAssistant.Services;
 using Microsoft.Maui.Controls.Shapes;
 using System.Text.RegularExpressions;
+using Microsoft.Maui.Media;
 
 namespace FinanceAssistant
 {
@@ -10,6 +11,8 @@ namespace FinanceAssistant
     {
         private readonly FinanceService _financeService;
         private readonly DatabaseService _databaseService;
+        private bool _isRecording = false;
+        private string? _currentAudioPath = null;
 
         public ChatPage(FinanceService financeService, DatabaseService databaseService)
         {
@@ -521,6 +524,189 @@ namespace FinanceAssistant
         private static string FormatCurrency(decimal amount)
         {
             return $"{amount:N0} RUB".Replace(",", " ");
+        }
+
+        private async void OnMicrophoneTapped(object? sender, EventArgs e)
+        {
+            if (_isRecording)
+            {
+                // Второе нажатие - пытаемся остановить запись
+                // MediaPicker управляет записью через системный диалог,
+                // поэтому просто показываем подсказку
+                return;
+            }
+
+            try
+            {
+                var status = await Permissions.RequestAsync<Permissions.Microphone>();
+                if (status != PermissionStatus.Granted)
+                {
+                    await DisplayAlert("Ошибка", "Необходимо разрешение на использование микрофона", "OK");
+                    return;
+                }
+
+                _isRecording = true;
+                MicrophoneIcon.Text = "⏹";
+                MicrophoneButton.BackgroundColor = Color.FromArgb("#FF6B6B");
+                
+                var statusMessage = CreateBotMessageView("🎤 Запись начата... Говорите. Нажмите 'Готово' в диалоге для завершения.");
+                MessagesContainer.Children.Add(statusMessage);
+                ScrollToBottom();
+
+                // MediaPicker.CaptureAudioAsync открывает системный диалог записи
+                // Пользователь записывает и нажимает "Готово" или "Отмена" в системном диалоге
+                var recording = await MediaPicker.Default.CaptureAudioAsync();
+                
+                // Удаляем статусное сообщение
+                MessagesContainer.Children.Remove(statusMessage);
+                
+                _isRecording = false;
+                MicrophoneIcon.Text = "🎤";
+                MicrophoneButton.BackgroundColor = Color.FromArgb("#21262D");
+
+                if (recording != null)
+                {
+                    await ProcessAudioRecordingAsync(recording);
+                }
+                else
+                {
+                    // Пользователь отменил запись
+                    var cancelMessage = CreateBotMessageView("Запись отменена.");
+                    MessagesContainer.Children.Add(cancelMessage);
+                    ScrollToBottom();
+                }
+            }
+            catch (Exception ex)
+            {
+                _isRecording = false;
+                MicrophoneIcon.Text = "🎤";
+                MicrophoneButton.BackgroundColor = Color.FromArgb("#21262D");
+                
+                var errorMessage = CreateBotMessageView($"❌ Ошибка записи: {ex.Message}");
+                MessagesContainer.Children.Add(errorMessage);
+                ScrollToBottom();
+            }
+        }
+
+        private async Task ProcessAudioRecordingAsync(FileResult recording)
+        {
+            try
+            {
+                var statusMessage = CreateBotMessageView("🔄 Обработка аудио...");
+                MessagesContainer.Children.Add(statusMessage);
+                ScrollToBottom();
+
+                // Читаем аудио файл
+                using var audioStream = await recording.OpenReadAsync();
+                var transcriptionResult = await _financeService.TranscribeAudioAsync(audioStream, recording.FileName ?? "audio.wav");
+
+                // Удаляем статусное сообщение
+                MessagesContainer.Children.Remove(statusMessage);
+
+                if (!string.IsNullOrEmpty(transcriptionResult.Error))
+                {
+                    var errorMessage = CreateBotMessageView($"❌ Ошибка: {transcriptionResult.Error}");
+                    MessagesContainer.Children.Add(errorMessage);
+                    ScrollToBottom();
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(transcriptionResult.Text))
+                {
+                    var errorMessage = CreateBotMessageView("❌ Не удалось распознать речь. Попробуйте еще раз.");
+                    MessagesContainer.Children.Add(errorMessage);
+                    ScrollToBottom();
+                    return;
+                }
+
+                // Показываем распознанный текст как сообщение пользователя
+                AddUserMessage(transcriptionResult.Text);
+                ScrollToBottom();
+
+                // Обрабатываем распознанный текст как обычное сообщение
+                await ProcessMessageAsync(transcriptionResult.Text);
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = CreateBotMessageView($"❌ Ошибка обработки аудио: {ex.Message}");
+                MessagesContainer.Children.Add(errorMessage);
+                ScrollToBottom();
+            }
+        }
+
+        private async Task ProcessMessageAsync(string message)
+        {
+            MessageEntry.IsEnabled = false;
+
+            // Analyze friendliness in background
+            _ = AnalyzeFriendlinessAsync(message);
+
+            var loadingView = CreateLoadingMessageView();
+            MessagesContainer.Children.Add(loadingView);
+            ScrollToBottom();
+
+            try
+            {
+                if (IsTransactionMessage(message))
+                {
+                    // Handle as transaction
+                    var result = await _financeService.ExtractTransactionsFromMessageAsync(message);
+                    MessagesContainer.Children.Remove(loadingView);
+
+                    if (result.Transactions != null && result.Transactions.Count > 0)
+                    {
+                        var botResponse = CreateBotMessageView(result.Analysis ?? "Я извлек следующие транзакции:");
+                        MessagesContainer.Children.Add(botResponse);
+                        ScrollToBottom();
+
+                        foreach (var extractedTransaction in result.Transactions)
+                        {
+                            if (extractedTransaction != null)
+                            {
+                                var transactionView = CreateTransactionPreviewView(extractedTransaction, result);
+                                MessagesContainer.Children.Add(transactionView);
+                                ScrollToBottom();
+                            }
+                        }
+
+                        if (result.Warnings != null && result.Warnings.Count > 0)
+                        {
+                            var warningsView = CreateWarningMessageView(result.Warnings);
+                            MessagesContainer.Children.Add(warningsView);
+                            ScrollToBottom();
+                        }
+                    }
+                    else
+                    {
+                        var noTransactionsView = CreateBotMessageView(
+                            result.Analysis ?? "Не удалось извлечь транзакции.\n\n" +
+                            "Попробуйте указать сумму явно, например:\n" +
+                            "'Потратил 500 рублей на еду'"
+                        );
+                        MessagesContainer.Children.Add(noTransactionsView);
+                        ScrollToBottom();
+                    }
+                }
+                else
+                {
+                    // Handle as general chat
+                    var chatResult = await _financeService.SendChatMessageAsync(message);
+                    MessagesContainer.Children.Remove(loadingView);
+
+                    var botResponse = CreateBotMessageView(chatResult.Response);
+                    MessagesContainer.Children.Add(botResponse);
+                    ScrollToBottom();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessagesContainer.Children.Remove(loadingView);
+                var errorView = CreateBotMessageView($"Произошла ошибка: {ex.Message}");
+                MessagesContainer.Children.Add(errorView);
+                ScrollToBottom();
+            }
+
+            MessageEntry.IsEnabled = true;
         }
     }
 }

@@ -157,6 +157,59 @@ namespace FinanceAssistant.Services
             }
             return null;
         }
+
+        public async Task<VoiceTranscriptionResult> TranscribeAudioAsync(Stream audioStream, string fileName = "audio.wav")
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+                httpClient.Timeout = TimeSpan.FromSeconds(60);
+
+                var content = new MultipartFormDataContent();
+                var streamContent = new StreamContent(audioStream);
+                streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("audio/wav");
+                content.Add(streamContent, "audio", fileName);
+                content.Add(new StringContent("wav"), "audio_format");
+
+                var response = await httpClient.PostAsync($"{_apiBaseUrl}/transcribe-voice", content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var result = JsonSerializer.Deserialize<VoiceTranscriptionResult>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    
+                    if (result != null)
+                    {
+                        return result;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error transcribing audio: {ex.Message}");
+                return new VoiceTranscriptionResult
+                {
+                    Text = "",
+                    Error = $"Ошибка транскрипции: {ex.Message}"
+                };
+            }
+
+            return new VoiceTranscriptionResult
+            {
+                Text = "",
+                Error = "Не удалось распознать речь. Проверьте подключение к серверу."
+            };
+        }
+    }
+
+    public class VoiceTranscriptionResult
+    {
+        public string Text { get; set; } = string.Empty;
+        public string? Error { get; set; }
+        public double Confidence { get; set; }
     }
 
     public class ChatResult
