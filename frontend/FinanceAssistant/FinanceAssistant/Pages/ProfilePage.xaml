@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="FinanceAssistant.Pages.ProfilePage"
+             BackgroundColor="{StaticResource BackgroundDark}"
+             Shell.NavBarIsVisible="False">
+
+    <Grid RowDefinitions="Auto,*">
+        
+        <!-- Header -->
+        <Grid Grid.Row="0" Padding="20,50,20,20" ColumnDefinitions="Auto,*">
+            <Border BackgroundColor="{StaticResource BackgroundElevated}"
+                    StrokeShape="RoundRectangle 20"
+                    Stroke="Transparent"
+                    HeightRequest="40"
+                    WidthRequest="40">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnBackTapped"/>
+                </Border.GestureRecognizers>
+                <Label Text="&lt;"
+                       TextColor="{StaticResource TextPrimary}"
+                       FontSize="20"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center"/>
+            </Border>
+            
+            <Label Grid.Column="1"
+                   Text="Profile"
+                   TextColor="{StaticResource TextPrimary}"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center"
+                   Margin="-40,0,0,0"/>
+        </Grid>
+
+        <!-- Content -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="20" Padding="20,10">
+                
+                <!-- Avatar -->
+                <VerticalStackLayout Spacing="15" HorizontalOptions="Center">
+                    <Border BackgroundColor="{StaticResource Primary}"
+                            StrokeShape="RoundRectangle 50"
+                            Stroke="Transparent"
+                            HeightRequest="100"
+                            WidthRequest="100"
+                            HorizontalOptions="Center">
+                        <Label x:Name="AvatarLabel"
+                               Text="U"
+                               TextColor="{StaticResource BackgroundDark}"
+                               FontSize="40"
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center"
+                               VerticalOptions="Center"/>
+                    </Border>
+                    
+                    <Label x:Name="UserNameDisplay"
+                           Text="User"
+                           TextColor="{StaticResource TextPrimary}"
+                           FontSize="24"
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+
+                <!-- Nickname Input -->
+                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                        StrokeShape="RoundRectangle 20"
+                        Stroke="Transparent"
+                        Padding="20">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Nickname"
+                               TextColor="{StaticResource TextSecondary}"
+                               FontSize="14"/>
+                        <Entry x:Name="NicknameEntry"
+                               Placeholder="Enter your nickname"
+                               PlaceholderColor="{StaticResource TextMuted}"
+                               TextColor="{StaticResource TextPrimary}"
+                               FontSize="16"
+                               BackgroundColor="Transparent"
+                               TextChanged="OnNicknameChanged"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Total Stats Cards -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="15">
+                    <!-- Total Earned -->
+                    <Border BackgroundColor="{StaticResource BackgroundCard}"
+                            StrokeShape="RoundRectangle 20"
+                            Stroke="Transparent"
+                            Padding="20">
+                        <VerticalStackLayout Spacing="8">
+                            <Border BackgroundColor="{StaticResource AccentGreen}"
+                                    StrokeShape="RoundRectangle 12"
+                                    Stroke="Transparent"
+                                    HeightRequest="40"
+                                    WidthRequest="40"
+                                    Opacity="0.2"
+                                    HorizontalOptions="Start">
+                                <Label Text="^"
+                                       TextColor="{StaticResource AccentGreen}"
+                                       FontSize="20"
+                                       FontAttributes="Bold"
+                                       HorizontalOptions="Center"
+                                       VerticalOptions="Center"/>
+                            </Border>
+                            <Label Text="Total Earned"
+                                   TextColor="{StaticResource TextSecondary}"
+                                   FontSize="12"/>
+                            <Label x:Name="TotalEarnedLabel"
+                                   Text="0 RUB"
+                                   TextColor="{StaticResource AccentGreen}"
+                                   FontSize="18"
+                                   FontAttributes="Bold"/>
+                        </VerticalStackLayout>
+                    </Border>
+                    
+                    <!-- Total Spent -->
+                    <Border Grid.Column="1"
+                            BackgroundColor="{StaticResource BackgroundCard}"
+                            StrokeShape="RoundRectangle 20"
+                            Stroke="Transparent"
+                            Padding="20">
+                        <VerticalStackLayout Spacing="8">
+                            <Border BackgroundColor="{StaticResource AccentRed}"
+                                    StrokeShape="RoundRectangle 12"
+                                    Stroke="Transparent"
+                                    HeightRequest="40"
+                                    WidthRequest="40"
+                                    Opacity="0.2"
+                                    HorizontalOptions="Start">
+                                <Label Text="v"
+                                       TextColor="{StaticResource AccentRed}"
+                                       FontSize="20"
+                                       FontAttributes="Bold"
+                                       HorizontalOptions="Center"
+                                       VerticalOptions="Center"/>
+                            </Border>
+                            <Label Text="Total Spent"
+                                   TextColor="{StaticResource TextSecondary}"
+                                   FontSize="12"/>
+                            <Label x:Name="TotalSpentLabel"
+                                   Text="0 RUB"
+                                   TextColor="{StaticResource AccentRed}"
+                                   FontSize="18"
+                                   FontAttributes="Bold"/>
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+
+                <!-- Balance Card -->
+                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                        StrokeShape="RoundRectangle 20"
+                        Stroke="Transparent"
+                        Padding="20">
+                    <HorizontalStackLayout Spacing="15">
+                        <Border BackgroundColor="{StaticResource Primary}"
+                                StrokeShape="RoundRectangle 12"
+                                Stroke="Transparent"
+                                HeightRequest="50"
+                                WidthRequest="50"
+                                Opacity="0.2">
+                            <Label Text="B"
+                                   TextColor="{StaticResource Primary}"
+                                   FontSize="24"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"
+                                   VerticalOptions="Center"/>
+                        </Border>
+                        <VerticalStackLayout VerticalOptions="Center">
+                            <Label Text="Current Balance"
+                                   TextColor="{StaticResource TextSecondary}"
+                                   FontSize="14"/>
+                            <Label x:Name="BalanceLabel"
+                                   Text="0 RUB"
+                                   TextColor="{StaticResource Primary}"
+                                   FontSize="24"
+                                   FontAttributes="Bold"/>
+                        </VerticalStackLayout>
+                    </HorizontalStackLayout>
+                </Border>
+
+                <!-- Additional Stats -->
+                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                        StrokeShape="RoundRectangle 20"
+                        Stroke="Transparent"
+                        Padding="20">
+                    <VerticalStackLayout Spacing="15">
+                        <Label Text="Account Info"
+                               TextColor="{StaticResource TextSecondary}"
+                               FontSize="14"/>
+                        
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" RowSpacing="15">
+                            <VerticalStackLayout>
+                                <Label x:Name="TotalTransactionsLabel"
+                                       Text="0"
+                                       TextColor="{StaticResource TextPrimary}"
+                                       FontSize="24"
+                                       FontAttributes="Bold"/>
+                                <Label Text="Transactions"
+                                       TextColor="{StaticResource TextSecondary}"
+                                       FontSize="12"/>
+                            </VerticalStackLayout>
+                            
+                            <VerticalStackLayout Grid.Column="1">
+                                <Label x:Name="TotalCategoriesLabel"
+                                       Text="0"
+                                       TextColor="{StaticResource TextPrimary}"
+                                       FontSize="24"
+                                       FontAttributes="Bold"/>
+                                <Label Text="Categories"
+                                       TextColor="{StaticResource TextSecondary}"
+                                       FontSize="12"/>
+                            </VerticalStackLayout>
+                            
+                            <VerticalStackLayout Grid.Row="1" Grid.ColumnSpan="2">
+                                <Label x:Name="MemberSinceLabel"
+                                       Text="-"
+                                       TextColor="{StaticResource TextPrimary}"
+                                       FontSize="16"
+                                       FontAttributes="Bold"/>
+                                <Label Text="Member Since"
+                                       TextColor="{StaticResource TextSecondary}"
+                                       FontSize="12"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Save Button -->
+                <Border BackgroundColor="{StaticResource Primary}"
+                        StrokeShape="RoundRectangle 20"
+                        Stroke="Transparent"
+                        Padding="20,18">
+                    <Border.Shadow>
+                        <Shadow Brush="{StaticResource Primary}"
+                                Offset="0,4"
+                                Radius="15"
+                                Opacity="0.4"/>
+                    </Border.Shadow>
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSaveTapped"/>
+                    </Border.GestureRecognizers>
+                    <Label Text="Save Changes"
+                           TextColor="{StaticResource BackgroundDark}"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"/>
+                </Border>
+
+                <BoxView HeightRequest="30" Color="Transparent"/>
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>
