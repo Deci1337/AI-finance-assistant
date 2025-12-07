@@ -40,6 +40,40 @@ def get_access_token():
     return None
 
 
+def get_salutespeech_token():
+    """
+    Получение access token для SaluteSpeech API
+    
+    ВАЖНО: Для работы SaluteSpeech API нужен отдельный Authorization Key.
+    
+    Returns:
+        Токен доступа SaluteSpeech или None
+    """
+    SALUTE_SPEECH_AUTH_KEY = 'Basic MDE5YWY5MzUtOGRlOC03MTlkLTgxNDctZjlhMTViMzVmZWJiOjhmNWI1NzYzLTBhODQtNDQyMi04MzI0LTBmNzY5NWMzZGUzZg=='
+    
+    if not SALUTE_SPEECH_AUTH_KEY:
+        return None
+    
+    try:
+        url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
+        payload = {'scope': 'SALUTE_SPEECH_PERS'}
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+            'RqUID': 'e1cda52c-b57a-477c-a65a-d9f896176e6d',
+            'Authorization': SALUTE_SPEECH_AUTH_KEY
+        }
+        response = requests.request("POST", url, headers=headers, data=payload, verify=False)
+        if response.status_code == 200:
+            return response.json().get('access_token')
+        else:
+            print(f"SaluteSpeech token error: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        print(f"Error getting SaluteSpeech token: {str(e)}")
+        return None
+
+
 def get_models(access_token):
     """Получение списка доступных моделей GigaChat"""
     url = "https://gigachat.devices.sberbank.ru/api/v1/models"
@@ -182,13 +216,16 @@ def transcribe_audio_salute_speech(access_token: str, audio_data: bytes, audio_f
     Распознавание речи через SaluteSpeech API
     
     Args:
-        access_token: Токен доступа GigaChat
+        access_token: Токен доступа SaluteSpeech (должен быть получен через get_salutespeech_token())
         audio_data: Байты аудио файла
         audio_format: Формат аудио (pcm16, oggopus, opus, mp3, wav, flac, alaw, mulaw)
         
     Returns:
         Распознанный текст или None
     """
+    if not access_token:
+        return None
+        
     try:
         url = SALUTE_SPEECH_URL
         
@@ -205,6 +242,10 @@ def transcribe_audio_salute_speech(access_token: str, audio_data: bytes, audio_f
                 return result['result']
             elif 'chunks' in result:
                 return ' '.join([chunk.get('alternatives', [{}])[0].get('text', '') for chunk in result['chunks']])
+        elif response.status_code == 401:
+            # SaluteSpeech требует отдельный токен, токен GigaChat не подходит
+            print(f"SaluteSpeech API: Unauthorized (401). SaluteSpeech требует отдельный токен доступа.")
+            return None
         else:
             print(f"SaluteSpeech API error: {response.status_code} - {response.text}")
             return None
@@ -262,10 +303,19 @@ def transcribe_audio_gigachat(access_token: str, audio_data: bytes, audio_format
             if 'choices' in result and len(result['choices']) > 0:
                 return result['choices'][0].get('message', {}).get('content', '')
         else:
-            return transcribe_audio_salute_speech(access_token, audio_data, audio_format)
+            # GigaChat Audio API не поддерживается или ошибка
+            # Не вызываем SaluteSpeech здесь, пусть это делает transcribe_audio_with_fallback
+            error_text = response.text
+            try:
+                error_json = response.json()
+                error_message = error_json.get('message', error_text)
+                print(f"GigaChat Audio API error: {response.status_code} - {error_message}")
+            except:
+                print(f"GigaChat Audio API error: {response.status_code} - {error_text}")
+            return None
     except Exception as e:
         print(f"GigaChat audio transcription error: {str(e)}")
-        return transcribe_audio_salute_speech(access_token, audio_data, audio_format)
+        return None
 
 
 def transcribe_audio_with_fallback(audio_data: bytes, audio_format: str = "wav") -> Optional[str]:
@@ -280,16 +330,28 @@ def transcribe_audio_with_fallback(audio_data: bytes, audio_format: str = "wav")
         Распознанный текст или None
     """
     try:
-        token = get_access_token()
-        if not token:
-            return None
+        # Пробуем GigaChat Audio API (основной метод)
+        gigachat_token = get_access_token()
+        if gigachat_token:
+            result = transcribe_audio_gigachat(gigachat_token, audio_data, audio_format)
+            if result:
+                return result
+        else:
+            print("Warning: Cannot get GigaChat access token for audio transcription")
         
-        result = transcribe_audio_gigachat(token, audio_data, audio_format)
-        if result:
-            return result
+        # Пробуем SaluteSpeech как fallback (только если есть отдельный токен)
+        # SaluteSpeech требует отдельный токен доступа, отличный от GigaChat
+        salutespeech_token = get_salutespeech_token()
+        if salutespeech_token:
+            result = transcribe_audio_salute_speech(salutespeech_token, audio_data, audio_format)
+            if result:
+                return result
+        else:
+            print("Info: SaluteSpeech token not available (requires separate Authorization Key)")
         
-        result = transcribe_audio_salute_speech(token, audio_data, audio_format)
-        return result
+        # Если оба метода не сработали, возвращаем None
+        print("Warning: Audio transcription failed - both GigaChat and SaluteSpeech APIs returned no result")
+        return None
     except Exception as e:
         print(f"Audio transcription error: {str(e)}")
         return None
