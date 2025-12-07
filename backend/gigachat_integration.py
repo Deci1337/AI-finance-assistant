@@ -14,8 +14,14 @@ from io import BytesIO
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-MODEL = "GigaChat-Pro"  # GigaChat-Lite не существует в API, используем Pro
+# Приоритет моделей: базовая GigaChat как основная (экономия токенов), Pro как fallback
+# Примечание: GigaChat-Lite не существует в API, используем базовую GigaChat
+PREFERRED_MODELS = ["GigaChat", "GigaChat-Plus", "GigaChat-Pro"]
+MODEL = "GigaChat"  # По умолчанию используем базовую GigaChat как основную модель
 SALUTE_SPEECH_URL = "https://smartspeech.sber.ru/rest/v1/speech:recognize"
+
+# Кэш для проверенных моделей
+_available_model_cache = None
 
 
 def get_access_token():
@@ -45,8 +51,90 @@ def get_models(access_token):
     return response.text
 
 
-def chat_completion(access_token, message, model=MODEL, temperature=0.7, max_tokens=2000):
-    """Выполнение запроса к GigaChat API"""
+def detect_available_model() -> str:
+    """
+    Автоматическое определение доступной модели GigaChat
+    
+    Пробует модели в порядке приоритета и возвращает первую доступную.
+    Кэширует результат для оптимизации.
+    
+    Returns:
+        Название доступной модели или "GigaChat-Pro" по умолчанию
+    """
+    global _available_model_cache
+    
+    # Используем кэш, если модель уже определена
+    if _available_model_cache is not None:
+        return _available_model_cache
+    
+    token = get_access_token()
+    if not token:
+        print("Warning: Cannot get access token, using default model GigaChat")
+        _available_model_cache = "GigaChat"
+        return _available_model_cache
+    
+    # Пробуем каждую модель из списка приоритетов
+    for model_name in PREFERRED_MODELS:
+        try:
+            # Простой тестовый запрос для проверки доступности модели
+            test_response = chat_completion(token, "тест", model=model_name, max_tokens=10)
+            
+            if 'error' in test_response:
+                error_code = test_response.get('error')
+                error_msg = test_response.get('message', '')
+                
+                # Если модель не найдена (404), пробуем следующую
+                if error_code == 404 or "No such model" in str(error_msg):
+                    print(f"Model {model_name} not available, trying next...")
+                    continue
+                # Если ошибка оплаты (402) для базовой модели, пробуем следующую как fallback
+                # Если ошибка для последней модели, используем её (возможно, токены закончатся позже)
+                elif error_code == 402:
+                    # Если это не последняя модель в списке, пробуем следующую
+                    if model_name != PREFERRED_MODELS[-1]:
+                        print(f"Warning: Payment required for {model_name}, trying next model as fallback...")
+                        continue  # Пробуем следующую модель
+                    else:
+                        print(f"Warning: Payment required for {model_name}, but model exists")
+                        _available_model_cache = model_name
+                        return model_name
+                else:
+                    # Другие ошибки - пробуем следующую модель
+                    continue
+            else:
+                # Модель работает!
+                print(f"✅ Using model: {model_name}")
+                _available_model_cache = model_name
+                return model_name
+                
+        except Exception as e:
+            print(f"Error testing model {model_name}: {str(e)}")
+            continue
+    
+    # Если ни одна модель не работает, используем базовую GigaChat по умолчанию (основная модель)
+    print("Warning: Could not detect available model, using GigaChat as default")
+    _available_model_cache = "GigaChat"
+    return _available_model_cache
+
+
+def chat_completion(access_token, message, model=None, temperature=0.7, max_tokens=2000):
+    """
+    Выполнение запроса к GigaChat API
+    
+    Args:
+        access_token: Токен доступа
+        message: Сообщение для отправки
+        model: Название модели (если None, используется автоматически определенная)
+        temperature: Температура генерации
+        max_tokens: Максимальное количество токенов
+        
+    Returns:
+        Ответ от API или словарь с ошибкой
+    """
+    # Если модель не указана, используем автоматически определенную
+    if model is None:
+        model = detect_available_model()
+    
     url = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
     headers = {
         'Content-Type': 'application/json',
@@ -64,11 +152,29 @@ def chat_completion(access_token, message, model=MODEL, temperature=0.7, max_tok
         'temperature': temperature,
         'max_tokens': max_tokens
     }
-    response = requests.request("POST", url, headers=headers, json=payload, verify=False)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        return {'error': response.status_code, 'message': response.text}
+    
+    try:
+        response = requests.request("POST", url, headers=headers, json=payload, verify=False, timeout=30)
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            error_text = response.text
+            try:
+                error_json = response.json()
+                error_message = error_json.get('message', error_text)
+            except:
+                error_message = error_text
+            
+            return {
+                'error': response.status_code,
+                'message': error_message,
+                'model_used': model
+            }
+    except requests.exceptions.Timeout:
+        return {'error': 'timeout', 'message': 'Request timeout', 'model_used': model}
+    except Exception as e:
+        return {'error': 'exception', 'message': str(e), 'model_used': model}
 
 
 def transcribe_audio_salute_speech(access_token: str, audio_data: bytes, audio_format: str = "pcm16") -> Optional[str]:
@@ -193,7 +299,8 @@ class GigaChatAIClient:
     """Клиент для работы с GigaChat API для анализа эмоций и финансовых советов"""
     
     def __init__(self):
-        self.model = MODEL
+        # Автоматически определяем доступную модель при создании клиента
+        self.model = detect_available_model()
     
     def transcribe_audio(self, audio_data: bytes, audio_format: str = "wav") -> Optional[str]:
         """
@@ -592,23 +699,67 @@ class GigaChatAIClient:
         try:
             token = get_access_token()
             if not token:
+                print("GigaChat transaction extraction: Cannot get access token")
                 return None
                 
             response = chat_completion(token, prompt, model=self.model, temperature=0.5, max_tokens=4000)
             
             if 'error' in response:
-                return None
+                error_code = response.get('error')
+                error_msg = response.get('message', '')
+                model_used = response.get('model_used', self.model)
+                
+                # Если модель не найдена, пробуем другую модель
+                if error_code == 404 or "No such model" in str(error_msg):
+                    print(f"Model {model_used} not available, trying fallback...")
+                    # Сбрасываем кэш и пробуем другую модель
+                    global _available_model_cache
+                    _available_model_cache = None
+                    self.model = detect_available_model()
+                    
+                    # Повторяем запрос с новой моделью
+                    if self.model != model_used:
+                        print(f"Retrying with model: {self.model}")
+                        response = chat_completion(token, prompt, model=self.model, temperature=0.5, max_tokens=4000)
+                        if 'error' in response:
+                            print(f"Fallback model also failed: {response.get('message', '')}")
+                            return None
+                    else:
+                        print("No alternative model available")
+                        return None
+                elif error_code == 402:
+                    print(f"Payment required for model {model_used}. Using fallback method.")
+                    # При ошибке оплаты возвращаем None, чтобы использовался fallback метод
+                    return None
+                else:
+                    print(f"GigaChat API error {error_code}: {error_msg}")
+                    return None
                 
             if 'choices' in response and len(response['choices']) > 0:
                 text_response = response['choices'][0].get('message', {}).get('content', '')
                 json_match = self._extract_json(text_response)
                 if json_match:
-                    result = json.loads(json_match)
-                    if isinstance(result, dict) and 'transactions' in result:
-                        result['extracted_parameters'] = extracted_params
-                        return result
+                    try:
+                        result = json.loads(json_match)
+                        if isinstance(result, dict) and 'transactions' in result:
+                            result['extracted_parameters'] = extracted_params
+                            print(f"✅ Successfully extracted {len(result.get('transactions', []))} transactions using model {self.model}")
+                            return result
+                        else:
+                            print(f"Invalid response format: missing 'transactions' key")
+                    except json.JSONDecodeError as e:
+                        print(f"JSON parsing error: {str(e)}")
+                        print(f"Extracted JSON: {json_match[:200]}...")
+                else:
+                    print("Could not extract JSON from response")
+                    print(f"Response preview: {text_response[:300]}...")
+            else:
+                print("Invalid response format: no 'choices' found")
+                
         except Exception as e:
             print(f"GigaChat transaction extraction error: {str(e)}")
+            import traceback
+            traceback.print_exc()
         
         return None
     
@@ -669,10 +820,84 @@ class GigaChatAIClient:
         return None
     
     def _extract_json(self, text: str) -> Optional[str]:
-        """Извлечение JSON из текста ответа"""
-        json_match = re.search(r'\[.*\]|\{.*\}', text, re.DOTALL)
+        """Извлечение JSON из текста ответа с улучшенной обработкой"""
+        import json
+        
+        # Сначала проверяем, есть ли JSON в markdown блоке (```json ... ```)
+        markdown_json_match = re.search(r'```json\s*(\{.*?\}|\[.*?\])\s*```', text, re.DOTALL)
+        if markdown_json_match:
+            json_str = markdown_json_match.group(1)
+            json_str = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', json_str)
+            try:
+                json.loads(json_str)
+                return json_str
+            except json.JSONDecodeError:
+                pass
+        
+        # Также проверяем markdown блок без указания языка (``` ... ```)
+        markdown_match = re.search(r'```\s*(\{.*?\}|\[.*?\])\s*```', text, re.DOTALL)
+        if markdown_match:
+            json_str = markdown_match.group(1)
+            json_str = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', json_str)
+            try:
+                json.loads(json_str)
+                return json_str
+            except json.JSONDecodeError:
+                pass
+        
+        # Сначала пробуем простой поиск JSON объекта или массива
+        json_match = re.search(r'\{.*\}|\[.*\]', text, re.DOTALL)
+        
         if json_match:
-            return json_match.group()
+            json_str = json_match.group()
+            # Удаляем управляющие символы, которые могут вызывать проблемы при парсинге
+            # Оставляем только разрешенные: \n, \r, \t
+            json_str = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', json_str)
+            
+            # Пробуем распарсить для проверки валидности
+            try:
+                json.loads(json_str)
+                return json_str
+            except json.JSONDecodeError:
+                # Если не получилось, пробуем найти валидный JSON более точно
+                # Ищем первый { и соответствующий }
+                start_idx = text.find('{')
+                if start_idx != -1:
+                    depth = 0
+                    for i in range(start_idx, len(text)):
+                        if text[i] == '{':
+                            depth += 1
+                        elif text[i] == '}':
+                            depth -= 1
+                            if depth == 0:
+                                json_candidate = text[start_idx:i+1]
+                                json_candidate = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', json_candidate)
+                                try:
+                                    json.loads(json_candidate)
+                                    return json_candidate
+                                except json.JSONDecodeError:
+                                    pass
+                                break
+                
+                # Если объект не найден, пробуем массив
+                start_idx = text.find('[')
+                if start_idx != -1:
+                    depth = 0
+                    for i in range(start_idx, len(text)):
+                        if text[i] == '[':
+                            depth += 1
+                        elif text[i] == ']':
+                            depth -= 1
+                            if depth == 0:
+                                json_candidate = text[start_idx:i+1]
+                                json_candidate = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', json_candidate)
+                                try:
+                                    json.loads(json_candidate)
+                                    return json_candidate
+                                except json.JSONDecodeError:
+                                    pass
+                                break
+        
         return None
     
     def _normalize_emotions(self, emotions: Dict[str, float]) -> Dict[str, float]:
@@ -1032,11 +1257,18 @@ def extract_transactions_with_fallback(user_message: str, context: Optional[str]
     """
     client = GigaChatAIClient()
     
+    # Пробуем использовать GigaChat API
     if client._is_available():
         result = client.extract_transactions(user_message, context)
+        # Проверяем, что результат валидный и содержит транзакции
         if result and isinstance(result, dict) and result.get("transactions"):
-            return result
+            # Проверяем, что транзакции не пустые
+            transactions = result.get("transactions", [])
+            if transactions and len(transactions) > 0:
+                return result
     
+    # Если GigaChat недоступен или вернул ошибку, используем fallback
+    print("Using fallback transaction extraction method")
     return _simple_transaction_extraction(user_message)
 
 
@@ -1053,39 +1285,67 @@ def _simple_transaction_extraction(message: str) -> Dict:
     text_lower = message.lower()
     transactions = []
     
-    income_keywords = ["получил", "заработал", "доход", "зарплата", "зарплату", "получила", "заработала", "прибыль"]
-    expense_keywords = ["потратил", "купил", "заплатил", "расход", "трата", "потратила", "купила", "заплатила", "потратил"]
+    income_keywords = ["получил", "заработал", "доход", "зарплата", "зарплату", "получила", "заработала", "прибыль", "отправила", "отправил", "подарок", "подарил"]
+    expense_keywords = ["потратил", "купил", "заплатил", "расход", "трата", "потратила", "купила", "заплатила"]
     
-    is_income = any(keyword in text_lower for keyword in income_keywords)
-    is_expense = any(keyword in text_lower for keyword in expense_keywords)
+    # Разбиваем сообщение на части для более точного определения типа транзакции
+    def _determine_transaction_type(text_around_amount: str) -> str:
+        """Определяет тип транзакции на основе контекста вокруг суммы"""
+        text_lower_local = text_around_amount.lower()
+        # Проверяем ключевые слова до и после суммы
+        has_income = any(keyword in text_lower_local for keyword in income_keywords)
+        has_expense = any(keyword in text_lower_local for keyword in expense_keywords)
+        
+        if has_income and not has_expense:
+            return "income"
+        elif has_expense:
+            return "expense"
+        # По умолчанию считаем расходом
+        return "expense"
     
-    if not is_income and not is_expense:
-        is_expense = True
-    
-    transaction_type = "income" if is_income and not is_expense else "expense"
-    
+    # Ищем суммы с контекстом
     amount_patterns = [
         r'(\d+[\s,.]?\d*)\s*(рубл[ейя]|rub|₽|р\.|руб)',
         r'(\d+[\s,.]?\d*)\s*(тысяч|тыс|к|k)',
         r'(\d+[\s,.]?\d*)\s*(миллион|млн|m)',
         r'(\d+[\s,.]?\d*)\s*(доллар|usd|\$|бакс)',
         r'(\d+[\s,.]?\d*)\s*(евро|eur|€)',
-        r'(\d+[\s,.]?\d*)'
     ]
     
-    amounts = []
+    # Извлекаем суммы с контекстом (50 символов до и после)
+    amounts_with_context = []
     for pattern in amount_patterns:
-        matches = re.findall(pattern, text_lower, re.IGNORECASE)
-        for match in matches:
-            amount_str = match[0] if isinstance(match, tuple) else match
+        for match in re.finditer(pattern, message, re.IGNORECASE):
+            start = max(0, match.start() - 50)
+            end = min(len(message), match.end() + 50)
+            context = message[start:end]
+            
+            amount_str = match.group(1) if match.groups() else match.group(0)
             try:
                 amount = float(amount_str.replace(',', '.').replace(' ', ''))
-                if 'тысяч' in str(match).lower() or 'тыс' in str(match).lower() or 'к' in str(match).lower():
-                    amount *= 1000
-                elif 'миллион' in str(match).lower() or 'млн' in str(match).lower() or 'm' in str(match).lower():
-                    amount *= 1000000
+                multiplier = 1
+                if 'тысяч' in match.group(0).lower() or 'тыс' in match.group(0).lower() or 'к' in match.group(0).lower():
+                    multiplier = 1000
+                elif 'миллион' in match.group(0).lower() or 'млн' in match.group(0).lower() or 'm' in match.group(0).lower():
+                    multiplier = 1000000
+                
+                amount *= multiplier
                 if amount > 0:
-                    amounts.append(amount)
+                    amounts_with_context.append((amount, context))
+            except ValueError:
+                continue
+    
+    # Если не нашли суммы с валютой, ищем просто числа
+    if not amounts_with_context:
+        for match in re.finditer(r'\d+[\s,.]?\d*', message):
+            start = max(0, match.start() - 50)
+            end = min(len(message), match.end() + 50)
+            context = message[start:end]
+            
+            try:
+                amount = float(match.group(0).replace(',', '.').replace(' ', ''))
+                if amount > 0:
+                    amounts_with_context.append((amount, context))
             except ValueError:
                 continue
     
@@ -1106,22 +1366,41 @@ def _simple_transaction_extraction(message: str) -> Dict:
             detected_category = category
             break
     
-    if amounts:
-        for amount in amounts[:3]:
+    if amounts_with_context:
+        for amount, context in amounts_with_context[:5]:  # Ограничиваем до 5 транзакций
+            # Определяем тип транзакции для каждой суммы на основе контекста
+            trans_type = _determine_transaction_type(context)
+            
+            # Определяем категорию для этой транзакции
+            trans_category = "Other"
+            context_lower = context.lower()
+            for category, keywords in category_keywords.items():
+                if any(keyword in context_lower for keyword in keywords):
+                    trans_category = category
+                    break
+            
+            # Извлекаем название из контекста
+            title = _extract_title_from_message(context, trans_type)
+            
             transaction = {
-                "type": transaction_type,
-                "title": _extract_title_from_message(message, transaction_type),
+                "type": trans_type,
+                "title": title,
                 "amount": float(amount),
-                "category": detected_category,
+                "category": trans_category,
                 "date": datetime.now().strftime("%Y-%m-%d"),
-                "description": message[:100],
+                "description": context[:100],
                 "confidence": 0.6
             }
             transactions.append(transaction)
     else:
+        # Если не нашли суммы, создаем одну транзакцию без суммы
+        default_type = "expense"  # По умолчанию считаем расходом
+        if any(keyword in text_lower for keyword in income_keywords):
+            default_type = "income"
+        
         transaction = {
-            "type": transaction_type,
-            "title": _extract_title_from_message(message, transaction_type),
+            "type": default_type,
+            "title": _extract_title_from_message(message, default_type),
             "amount": None,
             "category": detected_category,
             "date": datetime.now().strftime("%Y-%m-%d"),
@@ -1130,8 +1409,8 @@ def _simple_transaction_extraction(message: str) -> Dict:
         }
         transactions.append(transaction)
     
-    total_income = sum(t["amount"] for t in transactions if t["type"] == "income" and t["amount"])
-    total_expense = sum(t["amount"] for t in transactions if t["type"] == "expense" and t["amount"])
+    total_income = sum(t["amount"] for t in transactions if t["type"] == "income" and t.get("amount"))
+    total_expense = sum(t["amount"] for t in transactions if t["type"] == "expense" and t.get("amount"))
     
     return {
         "transactions": transactions,
@@ -1148,12 +1427,12 @@ def _simple_transaction_extraction(message: str) -> Dict:
 
 Общая оценка: Извлечено {len(transactions)} транзакций. {'Общая сумма расходов: ' + str(total_expense) + ' руб.' if total_expense > 0 else ''} {'Общая сумма доходов: ' + str(total_income) + ' руб.' if total_income > 0 else ''}
 
-Категории: {'Преобладают расходы' if total_expense > total_income else 'Преобладают доходы' if total_income > total_expense else 'Баланс доходов и расходов'}. Основная категория: {detected_category}.
+Категории: {'Преобладают расходы' if total_expense > total_income else 'Преобладают доходы' if total_income > total_expense else 'Баланс доходов и расходов'}.
 
 Рекомендации: {'Обратите внимание на размер расходов' if total_expense > 0 else 'Хорошо, что есть доходы'}. Рекомендуется вести учет всех транзакций для лучшего контроля финансов.
 
 Примечание: Данные извлечены с помощью простого анализа. Для более детального анализа с рекомендациями используйте GigaChat API.""",
-        "questions": ["Пожалуйста, уточните сумму транзакции", "Укажите точную дату транзакции"] if not amounts else [],
+        "questions": ["Пожалуйста, уточните сумму транзакции", "Укажите точную дату транзакции"] if not amounts_with_context else [],
         "warnings": ["Данные извлечены с помощью простого анализа. Для более точного результата используйте GigaChat API."],
         "extracted_parameters": {}
     }
