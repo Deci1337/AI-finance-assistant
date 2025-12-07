@@ -18,6 +18,7 @@ from gigachat_integration import (
     generate_comprehensive_advice_with_fallback, 
     extract_transactions_with_fallback,
     transcribe_audio_with_fallback,
+    analyze_friendliness_with_fallback,
     get_access_token,
     chat_completion,
     GigaChatAIClient
@@ -167,6 +168,18 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     """Модель ответа от ИИ"""
     response: str
+    timestamp: str
+
+
+class FriendlinessRequest(BaseModel):
+    """Модель запроса для анализа доброты"""
+    message: str  # Сообщение пользователя для анализа
+
+
+class FriendlinessResponse(BaseModel):
+    """Модель ответа для анализа доброты"""
+    friendliness_score: float  # Оценка доброты от 0.0 до 1.0
+    sentiment: str  # "positive", "neutral" или "negative"
     timestamp: str
 
 
@@ -504,6 +517,28 @@ async def transcribe_and_extract(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при обработке голосового сообщения: {str(e)}")
+
+
+@app.post("/analyze-friendliness", response_model=FriendlinessResponse)
+async def analyze_friendliness(request: FriendlinessRequest) -> FriendlinessResponse:
+    """
+    Анализ доброты/дружелюбности сообщения пользователя
+    
+    Анализирует сообщение и возвращает оценку доброты от 0.0 до 1.0:
+    - 0.0 - очень грубое, агрессивное сообщение
+    - 0.5 - нейтральное сообщение
+    - 1.0 - очень дружелюбное, вежливое сообщение
+    """
+    try:
+        result = analyze_friendliness_with_fallback(request.message)
+        
+        return FriendlinessResponse(
+            friendliness_score=result.get("friendliness_score", 0.5),
+            sentiment=result.get("sentiment", "neutral"),
+            timestamp=result.get("timestamp", datetime.now().isoformat())
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при анализе доброты: {str(e)}")
 
 
 @app.post("/chat", response_model=ChatResponse)

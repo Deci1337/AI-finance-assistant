@@ -1868,6 +1868,138 @@ def _simple_emotion_analysis(text: str) -> Dict[str, float]:
     return {k: v / total for k, v in emotions.items()}
 
 
+def analyze_friendliness_with_fallback(text: str) -> Dict:
+    """
+    Анализ доброты/дружелюбности сообщения с fallback на простой анализ
+    
+    Args:
+        text: Текст для анализа
+        
+    Returns:
+        Словарь с оценкой доброты (0.0 - 1.0), сентиментом и временной меткой
+    """
+    client = GigaChatAIClient()
+    
+    if client._is_available():
+        try:
+            token = get_access_token()
+            if token:
+                prompt = f"""Проанализируй сообщение пользователя и оцени его доброту/дружелюбность по шкале от 0.0 до 1.0, где:
+- 0.0 - очень грубое, агрессивное, невежливое сообщение
+- 0.5 - нейтральное сообщение
+- 1.0 - очень дружелюбное, вежливое, позитивное сообщение
+
+Сообщение: {text}
+
+Верни ответ ТОЛЬКО в формате JSON:
+{{
+    "friendliness_score": число от 0.0 до 1.0,
+    "sentiment": "positive" | "neutral" | "negative"
+}}
+
+Не добавляй никакого другого текста, только JSON."""
+
+                url = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
+                headers = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Authorization': f'Bearer {token}'
+                }
+                
+                payload = {
+                    'model': MODEL,
+                    'messages': [
+                        {
+                            'role': 'user',
+                            'content': prompt
+                        }
+                    ],
+                    'temperature': 0.3,
+                    'max_tokens': 200
+                }
+                
+                response = requests.post(url, headers=headers, json=payload, verify=False, timeout=10)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'choices' in result and len(result['choices']) > 0:
+                        content = result['choices'][0].get('message', {}).get('content', '')
+                        # Извлекаем JSON из ответа
+                        json_match = re.search(r'\{[^}]+\}', content)
+                        if json_match:
+                            friendliness_data = json.loads(json_match.group())
+                            friendliness_score = friendliness_data.get('friendliness_score', 0.5)
+                            sentiment = friendliness_data.get('sentiment', 'neutral')
+                            
+                            return {
+                                "friendliness_score": max(0.0, min(1.0, float(friendliness_score))),
+                                "sentiment": sentiment,
+                                "timestamp": datetime.now().isoformat()
+                            }
+        except Exception as e:
+            print(f"GigaChat friendliness analysis error: {str(e)}")
+    
+    # Fallback на простой анализ
+    return _simple_friendliness_analysis(text)
+
+
+def _simple_friendliness_analysis(text: str) -> Dict:
+    """
+    Простой анализ доброты без использования API (fallback)
+    
+    Args:
+        text: Текст для анализа
+        
+    Returns:
+        Словарь с оценкой доброты, сентиментом и временной меткой
+    """
+    text_lower = text.lower()
+    
+    # Позитивные слова увеличивают доброту
+    positive_words = ["пожалуйста", "спасибо", "благодарю", "извините", "простите", 
+                      "добрый", "хороший", "отлично", "замечательно", "рад", "счастлив"]
+    
+    # Негативные слова уменьшают доброту
+    negative_words = ["дурак", "идиот", "тупой", "плохо", "ужасно", "ненавижу", 
+                     "ненависть", "злой", "злюсь", "разозлился", "грубо"]
+    
+    # Грубые слова сильно уменьшают доброту
+    rude_words = ["блять", "ебан", "сука", "хуй", "пизд", "нахуй"]
+    
+    positive_count = sum(1 for word in positive_words if word in text_lower)
+    negative_count = sum(1 for word in negative_words if word in text_lower)
+    rude_count = sum(1 for word in rude_words if word in text_lower)
+    
+    # Базовая оценка 0.5 (нейтральная)
+    friendliness_score = 0.5
+    
+    # Позитивные слова увеличивают оценку
+    friendliness_score += positive_count * 0.1
+    
+    # Негативные слова уменьшают оценку
+    friendliness_score -= negative_count * 0.15
+    
+    # Грубые слова сильно уменьшают оценку
+    friendliness_score -= rude_count * 0.3
+    
+    # Ограничиваем диапазон от 0.0 до 1.0
+    friendliness_score = max(0.0, min(1.0, friendliness_score))
+    
+    # Определяем сентимент
+    if friendliness_score >= 0.6:
+        sentiment = "positive"
+    elif friendliness_score <= 0.4:
+        sentiment = "negative"
+    else:
+        sentiment = "neutral"
+    
+    return {
+        "friendliness_score": friendliness_score,
+        "sentiment": sentiment,
+        "timestamp": datetime.now().isoformat()
+    }
+
+
 def _simple_financial_advice(portfolio_data: Dict, analysis_type: str = "full") -> List[str]:
     """
     Простая генерация финансовых советов без использования API (fallback)
