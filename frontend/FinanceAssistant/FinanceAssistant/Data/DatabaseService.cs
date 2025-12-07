@@ -340,18 +340,24 @@ namespace FinanceAssistant.Data
             return data;
         }
 
-        // Generate test data for November and December
+        // Generate test data for the last 60 days (current month + previous month)
         public async Task<int> SeedTestDataAsync()
         {
             await InitAsync();
-            var random = new Random(42); // Fixed seed for reproducibility
+            var random = new Random();
             var categories = await GetCategoriesAsync();
             var expenseCategories = categories.Where(c => c.Type == TransactionType.Expense).ToList();
             var incomeCategories = categories.Where(c => c.Type == TransactionType.Income).ToList();
             
-            var testTransactions = new List<Transaction>();
+            if (expenseCategories.Count == 0 || incomeCategories.Count == 0)
+            {
+                return 0; // No categories available
+            }
             
-            // Expense templates with realistic amounts
+            var testTransactions = new List<Transaction>();
+            var today = DateTime.Now.Date;
+            
+            // Expense templates with realistic amounts (RUB)
             var expenseTemplates = new (string title, int minAmount, int maxAmount, string category)[]
             {
                 ("Groceries", 500, 3000, "Food"),
@@ -386,75 +392,59 @@ namespace FinanceAssistant.Data
                 ("Cashback", 200, 1000, "Other Income"),
             };
             
-            // Generate for November 2024
-            var novemberStart = new DateTime(2024, 11, 1);
-            var novemberDays = 30;
-            
-            // Generate for December 2024
-            var decemberStart = new DateTime(2024, 12, 1);
-            var decemberDays = DateTime.Now.Month == 12 ? DateTime.Now.Day : 31;
-            
-            void GenerateMonthData(DateTime monthStart, int daysInMonth)
+            // Generate data for the last 60 days
+            for (int dayOffset = 0; dayOffset < 60; dayOffset++)
             {
-                // Add 1-2 income transactions per month
-                var salaryDay = random.Next(1, 10);
-                var salaryCategory = incomeCategories.FirstOrDefault(c => c.Name == "Salary");
-                if (salaryCategory != null)
+                var transactionDate = today.AddDays(-dayOffset);
+                
+                // Add salary on 5th and 20th of each month
+                if (transactionDate.Day == 5 || transactionDate.Day == 20)
                 {
+                    var salaryCategory = incomeCategories.FirstOrDefault(c => c.Name == "Salary") ?? incomeCategories[0];
                     testTransactions.Add(new Transaction
                     {
                         Title = "Salary",
-                        Amount = random.Next(80000, 120000),
+                        Amount = random.Next(40000, 60000),
                         Type = TransactionType.Income,
                         CategoryId = salaryCategory.Id,
-                        Date = monthStart.AddDays(salaryDay - 1),
+                        Date = transactionDate,
                         Importance = ImportanceLevel.High
                     });
                 }
                 
-                // Add random additional income (0-2 per month)
-                var extraIncomes = random.Next(0, 3);
-                for (int i = 0; i < extraIncomes; i++)
+                // Add random income (10% chance per day)
+                if (random.Next(100) < 10)
                 {
                     var template = incomeTemplates[random.Next(1, incomeTemplates.Length)];
-                    var cat = incomeCategories.FirstOrDefault(c => c.Name == template.category);
-                    if (cat != null)
+                    var cat = incomeCategories.FirstOrDefault(c => c.Name == template.category) ?? incomeCategories[0];
+                    testTransactions.Add(new Transaction
                     {
-                        testTransactions.Add(new Transaction
-                        {
-                            Title = template.title,
-                            Amount = random.Next(template.minAmount, template.maxAmount),
-                            Type = TransactionType.Income,
-                            CategoryId = cat.Id,
-                            Date = monthStart.AddDays(random.Next(0, daysInMonth)),
-                            Importance = ImportanceLevel.Medium
-                        });
-                    }
+                        Title = template.title,
+                        Amount = random.Next(template.minAmount, template.maxAmount),
+                        Type = TransactionType.Income,
+                        CategoryId = cat.Id,
+                        Date = transactionDate,
+                        Importance = ImportanceLevel.Medium
+                    });
                 }
                 
-                // Add 30-50 expense transactions per month
-                var expenseCount = random.Next(30, 51);
-                for (int i = 0; i < expenseCount; i++)
+                // Add 1-4 expense transactions per day
+                var dailyExpenses = random.Next(1, 5);
+                for (int i = 0; i < dailyExpenses; i++)
                 {
                     var template = expenseTemplates[random.Next(expenseTemplates.Length)];
-                    var cat = expenseCategories.FirstOrDefault(c => c.Name == template.category);
-                    if (cat != null)
+                    var cat = expenseCategories.FirstOrDefault(c => c.Name == template.category) ?? expenseCategories[0];
+                    testTransactions.Add(new Transaction
                     {
-                        testTransactions.Add(new Transaction
-                        {
-                            Title = template.title,
-                            Amount = random.Next(template.minAmount, template.maxAmount),
-                            Type = TransactionType.Expense,
-                            CategoryId = cat.Id,
-                            Date = monthStart.AddDays(random.Next(0, daysInMonth)),
-                            Importance = (ImportanceLevel)random.Next(0, 3)
-                        });
-                    }
+                        Title = template.title,
+                        Amount = random.Next(template.minAmount, template.maxAmount),
+                        Type = TransactionType.Expense,
+                        CategoryId = cat.Id,
+                        Date = transactionDate,
+                        Importance = (ImportanceLevel)random.Next(0, 3)
+                    });
                 }
             }
-            
-            GenerateMonthData(novemberStart, novemberDays);
-            GenerateMonthData(decemberStart, decemberDays);
             
             await _database!.InsertAllAsync(testTransactions);
             return testTransactions.Count;

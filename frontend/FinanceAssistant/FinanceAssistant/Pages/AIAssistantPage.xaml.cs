@@ -120,28 +120,16 @@ namespace FinanceAssistant.Pages
                 VerticalOptions = LayoutOptions.Start
             };
             
-            // Try to load image, fallback to text avatar
+            // Load AI avatar image
             var avatar = new Image
             {
-                Source = "ai_avatar.png",
+                Source = "ai_avatar.jpg",
                 Aspect = Aspect.AspectFill,
                 HeightRequest = 40,
                 WidthRequest = 40
             };
             
-            // Create text fallback
-            var textAvatar = new Label
-            {
-                Text = "AI",
-                TextColor = Color.FromArgb("#0D1117"),
-                FontSize = 14,
-                FontAttributes = FontAttributes.Bold,
-                HorizontalOptions = LayoutOptions.Center,
-                VerticalOptions = LayoutOptions.Center
-            };
-            
-            // Use text avatar as default (image will overlay if exists)
-            avatarBorder.Content = textAvatar;
+            avatarBorder.Content = avatar;
             return avatarBorder;
         }
 
