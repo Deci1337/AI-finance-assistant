@@ -702,7 +702,7 @@ class GigaChatAIClient:
                 print("GigaChat transaction extraction: Cannot get access token")
                 return None
                 
-            response = chat_completion(token, prompt, model=self.model, temperature=0.5, max_tokens=4000)
+            response = chat_completion(token, prompt, model=self.model, temperature=0.7, max_tokens=6000)
             
             if 'error' in response:
                 error_code = response.get('error')
@@ -720,7 +720,7 @@ class GigaChatAIClient:
                     # Повторяем запрос с новой моделью
                     if self.model != model_used:
                         print(f"Retrying with model: {self.model}")
-                        response = chat_completion(token, prompt, model=self.model, temperature=0.5, max_tokens=4000)
+                        response = chat_completion(token, prompt, model=self.model, temperature=0.7, max_tokens=6000)
                         if 'error' in response:
                             print(f"Fallback model also failed: {response.get('message', '')}")
                             return None
@@ -737,21 +737,108 @@ class GigaChatAIClient:
                 
             if 'choices' in response and len(response['choices']) > 0:
                 text_response = response['choices'][0].get('message', {}).get('content', '')
+                
+                # Пробуем извлечь JSON несколько раз с разными методами
                 json_match = self._extract_json(text_response)
+                
+                # Если не получилось с первого раза, пробуем более агрессивное извлечение
+                if not json_match:
+                    # Пробуем найти JSON, который может быть в тексте с дополнительным контекстом
+                    json_match = self._extract_json_aggressive(text_response)
+                
                 if json_match:
                     try:
                         result = json.loads(json_match)
-                        if isinstance(result, dict) and 'transactions' in result:
-                            result['extracted_parameters'] = extracted_params
-                            print(f"✅ Successfully extracted {len(result.get('transactions', []))} transactions using model {self.model}")
-                            return result
-                        else:
+                        if isinstance(result, dict):
+                            # Если есть transactions, используем их
+                            if 'transactions' in result:
+                                result['extracted_parameters'] = extracted_params
+                                # Проверяем, что анализ достаточно развернутый
+                                analysis = result.get('analysis', '')
+                                if not analysis or len(analysis) < 500:
+                                    # Если анализ слишком короткий, извлекаем его из текста ответа или генерируем
+                                    if len(text_response) > len(analysis):
+                                        # Используем весь текст ответа как анализ, если он длиннее
+                                        result['analysis'] = self._extract_analysis_from_text(text_response, result.get('transactions', []))
+                                    else:
+                                        # Генерируем анализ на основе транзакций
+                                        result['analysis'] = self._generate_analysis_from_transactions(result.get('transactions', []), result.get('extracted_info', {}))
+                                print(f"✅ Successfully extracted {len(result.get('transactions', []))} transactions using model {self.model}")
+                                return result
+                            # Если нет transactions, но есть другие данные, пробуем создать структуру
+                            elif 'extracted_info' in result or 'analysis' in result:
+                                print(f"Response missing 'transactions' key, but has other data. Attempting to extract from text...")
+                                # Пробуем извлечь транзакции из текста ответа
+                                transactions_from_text = self._extract_transactions_from_text(text_response)
+                                if transactions_from_text:
+                                    result['transactions'] = transactions_from_text
+                                    result['extracted_parameters'] = extracted_params
+                                    print(f"✅ Extracted {len(transactions_from_text)} transactions from text using model {self.model}")
+                                    return result
                             print(f"Invalid response format: missing 'transactions' key")
+                        else:
+                            print(f"Invalid response format: result is not a dict")
+                            # Пробуем извлечь транзакции из текста ответа
+                            transactions_from_text = self._extract_transactions_from_text(text_response)
+                            if transactions_from_text:
+                                result = {
+                                    "transactions": transactions_from_text,
+                                    "extracted_info": {
+                                        "total_income": sum(t.get('amount', 0) for t in transactions_from_text if t.get('type') == 'income' and t.get('amount')),
+                                        "total_expense": sum(t.get('amount', 0) for t in transactions_from_text if t.get('type') == 'expense' and t.get('amount')),
+                                        "transactions_count": len(transactions_from_text),
+                                        "date_range": {
+                                            "earliest": transactions_from_text[0].get('date') if transactions_from_text else None,
+                                            "latest": transactions_from_text[-1].get('date') if transactions_from_text else None
+                                        }
+                                    },
+                                    "analysis": self._extract_analysis_from_text(text_response, transactions_from_text),
+                                    "questions": [],
+                                    "warnings": [],
+                                    "extracted_parameters": extracted_params
+                                }
+                                print(f"✅ Extracted {len(transactions_from_text)} transactions from non-dict response using model {self.model}")
+                                return result
                     except json.JSONDecodeError as e:
                         print(f"JSON parsing error: {str(e)}")
-                        print(f"Extracted JSON: {json_match[:200]}...")
+                        print(f"Extracted JSON preview: {json_match[:200]}...")
+                        # Пробуем исправить JSON
+                        fixed_json = self._fix_json(json_match)
+                        if fixed_json:
+                            try:
+                                result = json.loads(fixed_json)
+                                if isinstance(result, dict) and 'transactions' in result:
+                                    result['extracted_parameters'] = extracted_params
+                                    print(f"✅ Successfully extracted {len(result.get('transactions', []))} transactions after JSON fix using model {self.model}")
+                                    return result
+                            except json.JSONDecodeError:
+                                pass
                 else:
-                    print("Could not extract JSON from response")
+                    # Если не удалось извлечь JSON, пробуем извлечь транзакции напрямую из текста
+                    print("Could not extract JSON from response, trying to extract transactions from text...")
+                    transactions_from_text = self._extract_transactions_from_text(text_response)
+                    if transactions_from_text:
+                        # Создаем структуру ответа на основе извлеченных транзакций
+                        total_income = sum(t.get('amount', 0) for t in transactions_from_text if t.get('type') == 'income' and t.get('amount'))
+                        total_expense = sum(t.get('amount', 0) for t in transactions_from_text if t.get('type') == 'expense' and t.get('amount'))
+                        result = {
+                            "transactions": transactions_from_text,
+                            "extracted_info": {
+                                "total_income": total_income,
+                                "total_expense": total_expense,
+                                "transactions_count": len(transactions_from_text),
+                                "date_range": {
+                                    "earliest": transactions_from_text[0].get('date') if transactions_from_text else None,
+                                    "latest": transactions_from_text[-1].get('date') if transactions_from_text else None
+                                }
+                            },
+                            "analysis": self._extract_analysis_from_text(text_response, transactions_from_text),
+                            "questions": [],
+                            "warnings": [],
+                            "extracted_parameters": extracted_params
+                        }
+                        print(f"✅ Extracted {len(transactions_from_text)} transactions from text using model {self.model}")
+                        return result
                     print(f"Response preview: {text_response[:300]}...")
             else:
                 print("Invalid response format: no 'choices' found")
@@ -899,6 +986,184 @@ class GigaChatAIClient:
                                 break
         
         return None
+    
+    def _extract_json_aggressive(self, text: str) -> Optional[str]:
+        """Более агрессивное извлечение JSON из текста"""
+        import json
+        
+        # Пробуем найти JSON, который может быть окружен текстом
+        # Ищем все возможные JSON объекты в тексте
+        json_patterns = [
+            r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}',  # Простые вложенные объекты
+            r'\{.*?"transactions".*?\}',  # Объект с ключом transactions
+        ]
+        
+        for pattern in json_patterns:
+            matches = re.finditer(pattern, text, re.DOTALL)
+            for match in matches:
+                json_str = match.group()
+                json_str = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', json_str)
+                try:
+                    parsed = json.loads(json_str)
+                    if isinstance(parsed, dict) and 'transactions' in parsed:
+                        return json_str
+                except json.JSONDecodeError:
+                    continue
+        
+        return None
+    
+    def _fix_json(self, json_str: str) -> Optional[str]:
+        """Попытка исправить поврежденный JSON"""
+        import json
+        
+        # Убираем лишние запятые в конце объектов/массивов
+        json_str = re.sub(r',\s*}', '}', json_str)
+        json_str = re.sub(r',\s*]', ']', json_str)
+        
+        # Исправляем одинарные кавычки на двойные (если они используются для ключей)
+        json_str = re.sub(r"'(\w+)':", r'"\1":', json_str)
+        
+        try:
+            json.loads(json_str)
+            return json_str
+        except json.JSONDecodeError:
+            return None
+    
+    def _extract_transactions_from_text(self, text: str) -> List[Dict]:
+        """Извлечение транзакций из текстового ответа API"""
+        transactions = []
+        
+        # Ищем паттерны транзакций в тексте
+        # Формат: "type": "income/expense", "amount": число, "title": "..."
+        transaction_patterns = [
+            r'"type"\s*:\s*"(income|expense)"[^}]*"amount"\s*:\s*(\d+\.?\d*)[^}]*"title"\s*:\s*"([^"]+)"',
+            r'"amount"\s*:\s*(\d+\.?\d*)[^}]*"type"\s*:\s*"(income|expense)"[^}]*"title"\s*:\s*"([^"]+)"',
+        ]
+        
+        for pattern in transaction_patterns:
+            matches = re.finditer(pattern, text, re.IGNORECASE)
+            for match in matches:
+                if len(match.groups()) >= 3:
+                    trans_type = match.group(1) if 'type' in pattern else match.group(2)
+                    amount = float(match.group(2) if 'type' in pattern else match.group(1))
+                    title = match.group(3)
+                    
+                    transaction = {
+                        "type": trans_type,
+                        "title": title,
+                        "amount": amount,
+                        "category": "Other",
+                        "date": datetime.now().strftime("%Y-%m-%d"),
+                        "description": "",
+                        "confidence": 0.7
+                    }
+                    transactions.append(transaction)
+        
+        return transactions
+    
+    def _extract_analysis_from_text(self, text: str, transactions: List[Dict]) -> str:
+        """Извлечение анализа из текстового ответа API"""
+        # Ищем анализ в тексте - обычно это длинный блок текста после JSON или в отдельном разделе
+        analysis_patterns = [
+            r'анализ[:\s]+(.*?)(?:\n\n|\n\n\n|$)',
+            r'###?\s*Финансовый анализ[:\s]+(.*?)(?:\n\n|\n\n\n|$)',
+            r'###?\s*Анализ[:\s]+(.*?)(?:\n\n|\n\n\n|$)',
+            r'Общая оценка[:\s]+(.*?)(?:\n\n|\n\n\n|$)',
+        ]
+        
+        for pattern in analysis_patterns:
+            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+            if match:
+                analysis = match.group(1).strip()
+                if len(analysis) > 200:
+                    return analysis
+        
+        # Если не нашли структурированный анализ, берем весь текст после JSON или длинный блок текста
+        # Убираем JSON блоки
+        text_clean = re.sub(r'```json.*?```', '', text, flags=re.DOTALL)
+        text_clean = re.sub(r'\{.*?\}', '', text_clean, flags=re.DOTALL)
+        text_clean = text_clean.strip()
+        
+        # Берем самый длинный абзац
+        paragraphs = [p.strip() for p in text_clean.split('\n\n') if len(p.strip()) > 100]
+        if paragraphs:
+            # Объединяем несколько абзацев
+            analysis = '\n\n'.join(paragraphs[:5])
+            if len(analysis) > 300:
+                return analysis
+        
+        # Если ничего не нашли, генерируем анализ на основе транзакций
+        return self._generate_analysis_from_transactions(transactions, {})
+    
+    def _generate_analysis_from_transactions(self, transactions: List[Dict], extracted_info: Dict) -> str:
+        """Генерация развернутого анализа на основе транзакций"""
+        if not transactions:
+            return "Транзакции не найдены в сообщении."
+        
+        total_income = extracted_info.get('total_income', sum(t.get('amount', 0) for t in transactions if t.get('type') == 'income' and t.get('amount')))
+        total_expense = extracted_info.get('total_expense', sum(t.get('amount', 0) for t in transactions if t.get('type') == 'expense' and t.get('amount')))
+        
+        income_count = len([t for t in transactions if t.get('type') == 'income'])
+        expense_count = len([t for t in transactions if t.get('type') == 'expense'])
+        
+        # Анализ категорий
+        categories = {}
+        for t in transactions:
+            cat = t.get('category', 'Other')
+            categories[cat] = categories.get(cat, 0) + t.get('amount', 0)
+        
+        dominant_category = max(categories.items(), key=lambda x: x[1])[0] if categories else None
+        
+        analysis_parts = []
+        
+        # Общая оценка
+        analysis_parts.append(f"### Общая оценка транзакций")
+        analysis_parts.append(f"Всего зарегистрировано {len(transactions)} транзакций: {income_count} доходов и {expense_count} расходов.")
+        if total_income > 0:
+            analysis_parts.append(f"Общая сумма доходов составляет {total_income:,.0f} рублей.")
+        if total_expense > 0:
+            analysis_parts.append(f"Общая сумма расходов составляет {total_expense:,.0f} рублей.")
+        
+        balance = total_income - total_expense
+        if balance > 0:
+            analysis_parts.append(f"Баланс положительный: {balance:,.0f} рублей. Это хороший знак финансовой стабильности.")
+        elif balance < 0:
+            analysis_parts.append(f"Баланс отрицательный: {abs(balance):,.0f} рублей. Стоит обратить внимание на превышение расходов над доходами.")
+        else:
+            analysis_parts.append("Доходы и расходы сбалансированы.")
+        
+        # Анализ категорий
+        if categories:
+            analysis_parts.append(f"\n### Анализ категорий")
+            analysis_parts.append(f"Расходы распределены по следующим категориям: {', '.join(categories.keys())}.")
+            if dominant_category:
+                analysis_parts.append(f"Наибольшая доля расходов приходится на категорию '{dominant_category}' ({categories[dominant_category]:,.0f} рублей).")
+        
+        # Рекомендации
+        analysis_parts.append(f"\n### Рекомендации")
+        if total_expense > total_income * 0.8:
+            analysis_parts.append("Расходы составляют более 80% от доходов. Рекомендуется пересмотреть бюджет и найти возможности для экономии.")
+        if expense_count > income_count * 2:
+            analysis_parts.append("Количество расходов значительно превышает количество доходов. Стоит проанализировать, какие расходы можно оптимизировать.")
+        if balance > 0:
+            analysis_parts.append("Рекомендуется отложить часть положительного баланса на непредвиденные расходы или инвестиции.")
+        
+        # Практические советы
+        analysis_parts.append(f"\n### Практические советы")
+        analysis_parts.append("Для улучшения управления финансами рекомендуется:")
+        analysis_parts.append("1. Регулярно отслеживать все транзакции")
+        analysis_parts.append("2. Планировать бюджет на месяц вперед")
+        analysis_parts.append("3. Анализировать категории расходов и находить возможности для оптимизации")
+        analysis_parts.append("4. Создать резервный фонд на случай непредвиденных ситуаций")
+        
+        # Прогноз
+        analysis_parts.append(f"\n### Прогноз и планирование")
+        if balance > 0:
+            analysis_parts.append("При сохранении текущей динамики доходов и расходов финансовое положение будет стабильным.")
+        else:
+            analysis_parts.append("Необходимо пересмотреть структуру расходов, чтобы избежать финансовых трудностей в будущем.")
+        
+        return '\n\n'.join(analysis_parts)
     
     def _normalize_emotions(self, emotions: Dict[str, float]) -> Dict[str, float]:
         """Нормализация эмоций (сумма должна быть ~1.0)"""
@@ -1261,11 +1526,24 @@ def extract_transactions_with_fallback(user_message: str, context: Optional[str]
     if client._is_available():
         result = client.extract_transactions(user_message, context)
         # Проверяем, что результат валидный и содержит транзакции
-        if result and isinstance(result, dict) and result.get("transactions"):
-            # Проверяем, что транзакции не пустые
+        if result and isinstance(result, dict):
             transactions = result.get("transactions", [])
+            # Если есть транзакции, возвращаем результат (даже если анализ короткий, он будет дополнен)
             if transactions and len(transactions) > 0:
+                # Убеждаемся, что анализ есть и достаточно развернутый
+                if not result.get('analysis') or len(result.get('analysis', '')) < 300:
+                    result['analysis'] = client._generate_analysis_from_transactions(transactions, result.get('extracted_info', {}))
                 return result
+            # Если транзакций нет, но есть анализ или другие данные, пробуем извлечь транзакции из текста
+            elif result.get('analysis') or result.get('extracted_info'):
+                # Пробуем извлечь транзакции из анализа или других полей
+                text_to_extract = result.get('analysis', '') + ' ' + str(result.get('extracted_info', ''))
+                transactions_from_text = client._extract_transactions_from_text(text_to_extract)
+                if transactions_from_text:
+                    result['transactions'] = transactions_from_text
+                    if not result.get('analysis') or len(result.get('analysis', '')) < 300:
+                        result['analysis'] = client._generate_analysis_from_transactions(transactions_from_text, result.get('extracted_info', {}))
+                    return result
     
     # Если GigaChat недоступен или вернул ошибку, используем fallback
     print("Using fallback transaction extraction method")
@@ -1423,19 +1701,77 @@ def _simple_transaction_extraction(message: str) -> Dict:
                 "latest": transactions[-1]["date"] if transactions else None
             }
         },
-        "analysis": f"""АНАЛИЗ ТРАНЗАКЦИЙ:
-
-Общая оценка: Извлечено {len(transactions)} транзакций. {'Общая сумма расходов: ' + str(total_expense) + ' руб.' if total_expense > 0 else ''} {'Общая сумма доходов: ' + str(total_income) + ' руб.' if total_income > 0 else ''}
-
-Категории: {'Преобладают расходы' if total_expense > total_income else 'Преобладают доходы' if total_income > total_expense else 'Баланс доходов и расходов'}.
-
-Рекомендации: {'Обратите внимание на размер расходов' if total_expense > 0 else 'Хорошо, что есть доходы'}. Рекомендуется вести учет всех транзакций для лучшего контроля финансов.
-
-Примечание: Данные извлечены с помощью простого анализа. Для более детального анализа с рекомендациями используйте GigaChat API.""",
+        "analysis": _generate_fallback_analysis(transactions, total_income, total_expense),
         "questions": ["Пожалуйста, уточните сумму транзакции", "Укажите точную дату транзакции"] if not amounts_with_context else [],
         "warnings": ["Данные извлечены с помощью простого анализа. Для более точного результата используйте GigaChat API."],
         "extracted_parameters": {}
     }
+
+
+def _generate_fallback_analysis(transactions: List[Dict], total_income: float, total_expense: float) -> str:
+    """Генерация развернутого анализа для fallback метода"""
+    income_count = len([t for t in transactions if t.get('type') == 'income'])
+    expense_count = len([t for t in transactions if t.get('type') == 'expense'])
+    
+    # Анализ категорий
+    categories = {}
+    for t in transactions:
+        cat = t.get('category', 'Other')
+        categories[cat] = categories.get(cat, 0) + (t.get('amount', 0) or 0)
+    
+    dominant_category = max(categories.items(), key=lambda x: x[1])[0] if categories else None
+    
+    analysis_parts = []
+    
+    # Общая оценка
+    analysis_parts.append("### Общая оценка транзакций")
+    analysis_parts.append(f"Всего зарегистрировано {len(transactions)} транзакций: {income_count} доходов и {expense_count} расходов.")
+    if total_income > 0:
+        analysis_parts.append(f"Общая сумма доходов составляет {total_income:,.0f} рублей.")
+    if total_expense > 0:
+        analysis_parts.append(f"Общая сумма расходов составляет {total_expense:,.0f} рублей.")
+    
+    balance = total_income - total_expense
+    if balance > 0:
+        analysis_parts.append(f"Баланс положительный: {balance:,.0f} рублей. Это хороший знак финансовой стабильности.")
+    elif balance < 0:
+        analysis_parts.append(f"Баланс отрицательный: {abs(balance):,.0f} рублей. Стоит обратить внимание на превышение расходов над доходами.")
+    else:
+        analysis_parts.append("Доходы и расходы сбалансированы.")
+    
+    # Анализ категорий
+    if categories:
+        analysis_parts.append("\n### Анализ категорий")
+        analysis_parts.append(f"Расходы распределены по следующим категориям: {', '.join(categories.keys())}.")
+        if dominant_category:
+            analysis_parts.append(f"Наибольшая доля расходов приходится на категорию '{dominant_category}' ({categories[dominant_category]:,.0f} рублей).")
+    
+    # Рекомендации
+    analysis_parts.append("\n### Рекомендации")
+    if total_expense > total_income * 0.8 if total_income > 0 else True:
+        analysis_parts.append("Расходы составляют значительную долю от доходов. Рекомендуется пересмотреть бюджет и найти возможности для экономии.")
+    if expense_count > income_count * 2:
+        analysis_parts.append("Количество расходов значительно превышает количество доходов. Стоит проанализировать, какие расходы можно оптимизировать.")
+    if balance > 0:
+        analysis_parts.append("Рекомендуется отложить часть положительного баланса на непредвиденные расходы или инвестиции.")
+    analysis_parts.append("Рекомендуется вести учет всех транзакций для лучшего контроля финансов.")
+    
+    # Практические советы
+    analysis_parts.append("\n### Практические советы")
+    analysis_parts.append("Для улучшения управления финансами рекомендуется:")
+    analysis_parts.append("1. Регулярно отслеживать все транзакции")
+    analysis_parts.append("2. Планировать бюджет на месяц вперед")
+    analysis_parts.append("3. Анализировать категории расходов и находить возможности для оптимизации")
+    analysis_parts.append("4. Создать резервный фонд на случай непредвиденных ситуаций")
+    
+    # Прогноз
+    analysis_parts.append("\n### Прогноз и планирование")
+    if balance > 0:
+        analysis_parts.append("При сохранении текущей динамики доходов и расходов финансовое положение будет стабильным.")
+    else:
+        analysis_parts.append("Необходимо пересмотреть структуру расходов, чтобы избежать финансовых трудностей в будущем.")
+    
+    return '\n\n'.join(analysis_parts)
 
 
 def _extract_title_from_message(message: str, transaction_type: str) -> str:
