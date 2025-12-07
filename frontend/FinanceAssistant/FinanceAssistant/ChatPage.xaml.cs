@@ -1,12 +1,14 @@
 using FinanceAssistant.Models;
 using FinanceAssistant.Services;
 using Microsoft.Maui.Controls.Shapes;
+using Microsoft.Maui.Media;
 
 namespace FinanceAssistant
 {
     public partial class ChatPage : ContentPage
     {
         private readonly FinanceService _financeService;
+        private bool _isRecording = false;
 
         public ChatPage()
         {
@@ -177,7 +179,7 @@ namespace FinanceAssistant
             return border;
         }
 
-        private View CreateTransactionPreviewView(FinanceAssistant.Services.ExtractedTransaction extractedTransaction, FinanceAssistant.Services.TransactionExtractionResult result)
+        private View CreateTransactionPreviewView(FinanceAssistant.Services.ExtractedTransaction extractedTransaction, object result)
         {
             var border = new Border
             {
@@ -361,6 +363,141 @@ namespace FinanceAssistant
         private static string FormatCurrency(decimal amount)
         {
             return $"{amount:N0} RUB".Replace(",", " ");
+        }
+
+        private async void OnMicrophoneTapped(object? sender, EventArgs e)
+        {
+            if (_isRecording)
+            {
+                await StopRecording();
+            }
+            else
+            {
+                await StartRecording();
+            }
+        }
+
+        private async Task StartRecording()
+        {
+            try
+            {
+                var status = await Permissions.RequestAsync<Permissions.Microphone>();
+                if (status != PermissionStatus.Granted)
+                {
+                    await DisplayAlert("Ошибка", "Необходимо разрешение на использование микрофона", "ОК");
+                    return;
+                }
+
+                _isRecording = true;
+                MicrophoneIcon.Text = "⏹";
+                MicrophoneIcon.TextColor = Color.FromArgb("#FF6B6B");
+
+                var recordingView = CreateBotMessageView("Запись начата... Говорите.");
+                MessagesContainer.Children.Add(recordingView);
+                ScrollToBottom();
+
+                var audioFile = await MediaPicker.CaptureAudioAsync();
+                
+                if (audioFile != null)
+                {
+                    await ProcessAudioFile(audioFile);
+                }
+                else
+                {
+                    var cancelView = CreateBotMessageView("Запись отменена");
+                    MessagesContainer.Children.Add(cancelView);
+                    ScrollToBottom();
+                }
+            }
+            catch (Exception ex)
+            {
+                var errorView = CreateBotMessageView($"Ошибка при записи: {ex.Message}");
+                MessagesContainer.Children.Add(errorView);
+                ScrollToBottom();
+            }
+            finally
+            {
+                _isRecording = false;
+                MicrophoneIcon.Text = "🎤";
+                MicrophoneIcon.TextColor = Color.FromArgb("#FFFFFF");
+            }
+        }
+
+        private async Task StopRecording()
+        {
+            _isRecording = false;
+            MicrophoneIcon.Text = "🎤";
+            MicrophoneIcon.TextColor = Color.FromArgb("#FFFFFF");
+        }
+
+        private async Task ProcessAudioFile(FileResult audioFile)
+        {
+            try
+            {
+                var loadingView = CreateLoadingMessageView();
+                MessagesContainer.Children.Add(loadingView);
+                ScrollToBottom();
+
+                var result = await _financeService.TranscribeAndExtractAsync(audioFile);
+
+                MessagesContainer.Children.Remove(loadingView);
+
+                if (result.Success && !string.IsNullOrEmpty(result.Transcription))
+                {
+                    AddUserMessage($"[Голосовое сообщение]");
+                    
+                    var transcriptionView = CreateBotMessageView($"Распознано: {result.Transcription}");
+                    MessagesContainer.Children.Add(transcriptionView);
+                    ScrollToBottom();
+
+                    if (result.Transactions != null && result.Transactions.Count > 0)
+                    {
+                        var botResponse = CreateBotMessageView(result.Analysis ?? "Я извлек следующие транзакции:");
+                        MessagesContainer.Children.Add(botResponse);
+                        ScrollToBottom();
+
+                        foreach (var extractedTransaction in result.Transactions)
+                        {
+                            if (extractedTransaction != null)
+                            {
+                                var transactionView = CreateTransactionPreviewView(extractedTransaction, new { });
+                                MessagesContainer.Children.Add(transactionView);
+                                ScrollToBottom();
+                            }
+                        }
+
+                        if (result.Warnings != null && result.Warnings.Count > 0)
+                        {
+                            var warningsView = CreateWarningMessageView(result.Warnings);
+                            MessagesContainer.Children.Add(warningsView);
+                            ScrollToBottom();
+                        }
+                    }
+                    else
+                    {
+                        var noTransactionsView = CreateBotMessageView(
+                            "Не удалось извлечь транзакции из вашего сообщения. " +
+                            "Попробуйте указать сумму и тип транзакции более явно."
+                        );
+                        MessagesContainer.Children.Add(noTransactionsView);
+                        ScrollToBottom();
+                    }
+                }
+                else
+                {
+                    var errorView = CreateBotMessageView(
+                        result.Error ?? "Не удалось распознать речь. Попробуйте еще раз."
+                    );
+                    MessagesContainer.Children.Add(errorView);
+                    ScrollToBottom();
+                }
+            }
+            catch (Exception ex)
+            {
+                var errorView = CreateBotMessageView($"Ошибка при обработке аудио: {ex.Message}");
+                MessagesContainer.Children.Add(errorView);
+                ScrollToBottom();
+            }
         }
     }
 }

@@ -7,12 +7,15 @@ import requests
 import urllib3
 import json
 import re
+import base64
 from typing import Dict, List, Optional
 from datetime import datetime
+from io import BytesIO
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 MODEL = "GigaChat-Pro"
+SALUTE_SPEECH_URL = "https://smartspeech.sber.ru/rest/v1/speech:recognize"
 
 
 def get_access_token():
@@ -68,11 +71,145 @@ def chat_completion(access_token, message, model=MODEL, temperature=0.7, max_tok
         return {'error': response.status_code, 'message': response.text}
 
 
+def transcribe_audio_salute_speech(access_token: str, audio_data: bytes, audio_format: str = "pcm16") -> Optional[str]:
+    """
+    Распознавание речи через SaluteSpeech API
+    
+    Args:
+        access_token: Токен доступа GigaChat
+        audio_data: Байты аудио файла
+        audio_format: Формат аудио (pcm16, oggopus, opus, mp3, wav, flac, alaw, mulaw)
+        
+    Returns:
+        Распознанный текст или None
+    """
+    try:
+        url = SALUTE_SPEECH_URL
+        
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': f'audio/{audio_format}'
+        }
+        
+        response = requests.post(url, headers=headers, data=audio_data, verify=False, timeout=30)
+        
+        if response.status_code == 200:
+            result = response.json()
+            if 'result' in result:
+                return result['result']
+            elif 'chunks' in result:
+                return ' '.join([chunk.get('alternatives', [{}])[0].get('text', '') for chunk in result['chunks']])
+        else:
+            print(f"SaluteSpeech API error: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        print(f"SaluteSpeech transcription error: {str(e)}")
+        return None
+
+
+def transcribe_audio_gigachat(access_token: str, audio_data: bytes, audio_format: str = "wav") -> Optional[str]:
+    """
+    Распознавание речи через GigaChat API (если поддерживается)
+    
+    Args:
+        access_token: Токен доступа GigaChat
+        audio_data: Байты аудио файла
+        audio_format: Формат аудио
+        
+    Returns:
+        Распознанный текст или None
+    """
+    try:
+        audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+        
+        url = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {access_token}'
+        }
+        
+        payload = {
+            'model': MODEL,
+            'messages': [
+                {
+                    'role': 'user',
+                    'content': [
+                        {
+                            'type': 'audio',
+                            'audio': {
+                                'data': audio_base64,
+                                'format': audio_format
+                            }
+                        }
+                    ]
+                }
+            ],
+            'temperature': 0.3,
+            'max_tokens': 2000
+        }
+        
+        response = requests.post(url, headers=headers, json=payload, verify=False, timeout=30)
+        
+        if response.status_code == 200:
+            result = response.json()
+            if 'choices' in result and len(result['choices']) > 0:
+                return result['choices'][0].get('message', {}).get('content', '')
+        else:
+            return transcribe_audio_salute_speech(access_token, audio_data, audio_format)
+    except Exception as e:
+        print(f"GigaChat audio transcription error: {str(e)}")
+        return transcribe_audio_salute_speech(access_token, audio_data, audio_format)
+
+
+def transcribe_audio_with_fallback(audio_data: bytes, audio_format: str = "wav") -> Optional[str]:
+    """
+    Распознавание речи с fallback на разные методы
+    
+    Args:
+        audio_data: Байты аудио файла
+        audio_format: Формат аудио
+        
+    Returns:
+        Распознанный текст или None
+    """
+    try:
+        token = get_access_token()
+        if not token:
+            return None
+        
+        result = transcribe_audio_gigachat(token, audio_data, audio_format)
+        if result:
+            return result
+        
+        result = transcribe_audio_salute_speech(token, audio_data, audio_format)
+        return result
+    except Exception as e:
+        print(f"Audio transcription error: {str(e)}")
+        return None
+
+
 class GigaChatAIClient:
     """Клиент для работы с GigaChat API для анализа эмоций и финансовых советов"""
     
     def __init__(self):
         self.model = MODEL
+    
+    def transcribe_audio(self, audio_data: bytes, audio_format: str = "wav") -> Optional[str]:
+        """
+        Распознавание речи из аудио данных
+        
+        Args:
+            audio_data: Байты аудио файла
+            audio_format: Формат аудио (wav, mp3, oggopus и т.д.)
+            
+        Returns:
+            Распознанный текст или None
+        """
+        if not self._is_available():
+            return None
+        
+        return transcribe_audio_with_fallback(audio_data, audio_format)
         
     def _is_available(self) -> bool:
         """Проверка доступности GigaChat API"""

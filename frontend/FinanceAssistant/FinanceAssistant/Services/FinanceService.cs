@@ -1,6 +1,8 @@
 using FinanceAssistant.Models;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Maui.Storage;
+using Microsoft.Maui.Media;
 
 namespace FinanceAssistant.Services
 {
@@ -133,6 +135,70 @@ namespace FinanceAssistant.Services
                 Questions = new List<string> { "Проверьте подключение к серверу" }
             };
         }
+
+        public async Task<VoiceTranscriptionAndExtractionResult> TranscribeAndExtractAsync(FileResult audioFile)
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+                httpClient.Timeout = TimeSpan.FromSeconds(60);
+
+                using var content = new MultipartFormDataContent();
+                
+                var fileStream = await audioFile.OpenReadAsync();
+                var streamContent = new StreamContent(fileStream);
+                streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("audio/wav");
+                
+                content.Add(streamContent, "audio", audioFile.FileName ?? "audio.wav");
+                content.Add(new StringContent("wav"), "audio_format");
+
+                var response = await httpClient.PostAsync($"{API_BASE_URL}/transcribe-and-extract", content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var result = JsonSerializer.Deserialize<VoiceTranscriptionAndExtractionResult>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    
+                    if (result != null)
+                    {
+                        return result;
+                    }
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    return new VoiceTranscriptionAndExtractionResult
+                    {
+                        Success = false,
+                        Error = $"Ошибка сервера: {response.StatusCode}",
+                        Transcription = "",
+                        Transactions = new List<ExtractedTransaction>()
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error transcribing audio: {ex.Message}");
+                return new VoiceTranscriptionAndExtractionResult
+                {
+                    Success = false,
+                    Error = $"Ошибка: {ex.Message}",
+                    Transcription = "",
+                    Transactions = new List<ExtractedTransaction>()
+                };
+            }
+
+            return new VoiceTranscriptionAndExtractionResult
+            {
+                Success = false,
+                Error = "Не удалось обработать аудио",
+                Transcription = "",
+                Transactions = new List<ExtractedTransaction>()
+            };
+        }
     }
 
     public class TransactionExtractionResult
@@ -160,6 +226,17 @@ namespace FinanceAssistant.Services
         public decimal TotalIncome { get; set; }
         public decimal TotalExpense { get; set; }
         public int TransactionsCount { get; set; }
+    }
+
+    public class VoiceTranscriptionAndExtractionResult
+    {
+        public bool Success { get; set; }
+        public string Transcription { get; set; } = string.Empty;
+        public List<ExtractedTransaction> Transactions { get; set; } = new();
+        public string? Analysis { get; set; }
+        public List<string>? Questions { get; set; }
+        public List<string>? Warnings { get; set; }
+        public string? Error { get; set; }
     }
 }
 
