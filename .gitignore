@@ -25,3 +25,9 @@ obj/
 .DS_Store
 Thumbs.db
 
+# Maya Binary files
+*.mb
+
+# Markdown documentation files
+*.md
+

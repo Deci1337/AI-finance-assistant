@@ -3,7 +3,7 @@ AI Finance Assistant - Backend API
 FastAPI application for financial data processing and analysis
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -14,11 +14,13 @@ from datetime import datetime
 from mock_data import get_mock_portfolio, calculate_portfolio_metrics
 from gigachat_integration import (
     analyze_emotions_with_fallback, 
-    generate_financial_advice_with_fallback, 
+    generate_financial_advice_with_fallback,
     generate_comprehensive_advice_with_fallback, 
     extract_transactions_with_fallback,
+    transcribe_audio_with_fallback,
     get_access_token,
-    chat_completion
+    chat_completion,
+    GigaChatAIClient
 )
 
 # Создание экземпляра FastAPI приложения
@@ -401,6 +403,107 @@ async def extract_transactions(request: TransactionExtractionRequest) -> Transac
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при извлечении транзакций: {str(e)}")
+
+
+class VoiceTranscriptionResponse(BaseModel):
+    """Модель ответа для распознавания речи"""
+    transcription_id: str
+    transcription_date: str
+    text: str
+    confidence: Optional[float] = None
+    error: Optional[str] = None
+
+
+@app.post("/transcribe-voice", response_model=VoiceTranscriptionResponse)
+async def transcribe_voice(
+    audio: UploadFile = File(...),
+    audio_format: Optional[str] = Form("wav")
+) -> VoiceTranscriptionResponse:
+    """
+    Распознавание речи из голосового сообщения
+    
+    Принимает аудио файл и возвращает распознанный текст.
+    После распознавания текст можно использовать для извлечения транзакций.
+    
+    Поддерживаемые форматы: wav, mp3, oggopus, opus, flac, pcm16
+    """
+    try:
+        audio_data = await audio.read()
+        
+        if len(audio_data) == 0:
+            raise HTTPException(status_code=400, detail="Пустой аудио файл")
+        
+        transcribed_text = transcribe_audio_with_fallback(audio_data, audio_format)
+        
+        if not transcribed_text:
+            return VoiceTranscriptionResponse(
+                transcription_id=f"transcription_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                transcription_date=datetime.now().isoformat(),
+                text="",
+                error="Не удалось распознать речь. Проверьте качество аудио и формат файла."
+            )
+        
+        transcription_id = f"transcription_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        return VoiceTranscriptionResponse(
+            transcription_id=transcription_id,
+            transcription_date=datetime.now().isoformat(),
+            text=transcribed_text,
+            confidence=0.9
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при распознавании речи: {str(e)}")
+
+
+@app.post("/transcribe-and-extract", response_model=Dict)
+async def transcribe_and_extract(
+    audio: UploadFile = File(...),
+    audio_format: Optional[str] = Form("wav"),
+    context: Optional[str] = Form(None)
+) -> Dict:
+    """
+    Распознавание речи и автоматическое извлечение транзакций
+    
+    Комбинированный эндпоинт, который:
+    1. Распознает речь из аудио
+    2. Автоматически извлекает транзакции из распознанного текста
+    
+    Это удобно для голосового ввода в чате.
+    """
+    try:
+        audio_data = await audio.read()
+        
+        if len(audio_data) == 0:
+            raise HTTPException(status_code=400, detail="Пустой аудио файл")
+        
+        transcribed_text = transcribe_audio_with_fallback(audio_data, audio_format)
+        
+        if not transcribed_text:
+            return {
+                "success": False,
+                "error": "Не удалось распознать речь",
+                "transcription": "",
+                "transactions": []
+            }
+        
+        result = extract_transactions_with_fallback(transcribed_text, context)
+        
+        extraction_id = f"extraction_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        return {
+            "success": True,
+            "transcription": transcribed_text,
+            "extraction_id": extraction_id,
+            "extraction_date": datetime.now().isoformat(),
+            "transactions": result.get("transactions", []),
+            "extracted_info": result.get("extracted_info"),
+            "analysis": result.get("analysis"),
+            "questions": result.get("questions"),
+            "warnings": result.get("warnings"),
+            "extracted_parameters": result.get("extracted_parameters")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при обработке голосового сообщения: {str(e)}")
 
 
 @app.post("/chat", response_model=ChatResponse)
