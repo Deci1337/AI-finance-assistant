@@ -105,8 +105,36 @@ namespace FinanceAssistant.Pages
             }
         }
 
+        private View CreateAIAvatar()
+        {
+            var avatarBorder = new Border
+            {
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 20 },
+                Stroke = Color.FromArgb("#00D09E"),
+                StrokeThickness = 2,
+                HeightRequest = 40,
+                WidthRequest = 40,
+                VerticalOptions = LayoutOptions.Start
+            };
+            
+            var avatar = new Image
+            {
+                Source = "ai_avatar.png",
+                Aspect = Aspect.AspectFill,
+                HeightRequest = 40,
+                WidthRequest = 40
+            };
+            
+            avatarBorder.Content = avatar;
+            return avatarBorder;
+        }
+
         private void AddWelcomeMessage()
         {
+            var container = new HorizontalStackLayout { Spacing = 10 };
+            
+            container.Children.Add(CreateAIAvatar());
+
             var border = new Border
             {
                 BackgroundColor = Color.FromArgb("#161B22"),
@@ -114,7 +142,7 @@ namespace FinanceAssistant.Pages
                 Stroke = Brush.Transparent,
                 Padding = new Thickness(15),
                 HorizontalOptions = LayoutOptions.Start,
-                MaximumWidthRequest = 300
+                MaximumWidthRequest = 260
             };
 
             var stack = new VerticalStackLayout { Spacing = 5 };
@@ -138,8 +166,9 @@ namespace FinanceAssistant.Pages
             stack.Children.Add(nameLabel);
             stack.Children.Add(messageLabel);
             border.Content = stack;
-
-            MessagesContainer.Children.Add(border);
+            
+            container.Children.Add(border);
+            MessagesContainer.Children.Add(container);
         }
 
         private void OnSendMessage(object? sender, EventArgs e)
@@ -236,6 +265,10 @@ namespace FinanceAssistant.Pages
 
         private void AddAIMessage(string message)
         {
+            var container = new HorizontalStackLayout { Spacing = 10 };
+            
+            container.Children.Add(CreateAIAvatar());
+
             var border = new Border
             {
                 BackgroundColor = Color.FromArgb("#161B22"),
@@ -243,7 +276,7 @@ namespace FinanceAssistant.Pages
                 Stroke = Brush.Transparent,
                 Padding = new Thickness(15),
                 HorizontalOptions = LayoutOptions.Start,
-                MaximumWidthRequest = 300
+                MaximumWidthRequest = 260
             };
 
             var stack = new VerticalStackLayout { Spacing = 5 };
@@ -268,7 +301,8 @@ namespace FinanceAssistant.Pages
             stack.Children.Add(messageLabel);
             border.Content = stack;
             
-            MessagesContainer.Children.Add(border);
+            container.Children.Add(border);
+            MessagesContainer.Children.Add(container);
             ScrollToBottom();
         }
 
@@ -287,11 +321,15 @@ namespace FinanceAssistant.Pages
             ScrollToBottom();
         }
 
-        private Border? _typingIndicator;
+        private HorizontalStackLayout? _typingContainer;
 
         private void AddTypingIndicator()
         {
-            _typingIndicator = new Border
+            _typingContainer = new HorizontalStackLayout { Spacing = 10 };
+            
+            _typingContainer.Children.Add(CreateAIAvatar());
+
+            var border = new Border
             {
                 BackgroundColor = Color.FromArgb("#161B22"),
                 StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(15, 15, 15, 0) },
@@ -308,17 +346,18 @@ namespace FinanceAssistant.Pages
                 FontSize = 14
             };
 
-            _typingIndicator.Content = label;
-            MessagesContainer.Children.Add(_typingIndicator);
+            border.Content = label;
+            _typingContainer.Children.Add(border);
+            MessagesContainer.Children.Add(_typingContainer);
             ScrollToBottom();
         }
 
         private void RemoveTypingIndicator()
         {
-            if (_typingIndicator != null)
+            if (_typingContainer != null)
             {
-                MessagesContainer.Children.Remove(_typingIndicator);
-                _typingIndicator = null;
+                MessagesContainer.Children.Remove(_typingContainer);
+                _typingContainer = null;
             }
         }
 

@@ -164,14 +164,52 @@ namespace FinanceAssistant
         {
             var messageView = CreateBotMessageView(
                 "Привет! Я ваш финансовый помощник.\n\n" +
-                "Расскажите мне о ваших тратах, и я автоматически добавлю их.\n\n" +
-                "Примеры:\n" +
+                "Вы можете:\n" +
+                "- Задавать любые вопросы о финансах\n" +
+                "- Добавлять транзакции голосом\n\n" +
+                "Примеры транзакций:\n" +
                 "- Купил хлеб за 50 рублей\n" +
-                "- Получил зарплату 85000\n" +
-                "- Потратил 2000 на обед\n\n" +
+                "- Получил зарплату 85000\n\n" +
+                "Примеры вопросов:\n" +
+                "- Как экономить деньги?\n" +
+                "- Что такое инвестиции?\n\n" +
                 "Нажмите * чтобы настроить IP сервера"
             );
             MessagesContainer.Children.Add(messageView);
+        }
+
+        private bool IsTransactionMessage(string message)
+        {
+            var messageLower = message.ToLower();
+            
+            // Keywords indicating a transaction
+            var transactionKeywords = new[]
+            {
+                "потратил", "потратила", "потратили",
+                "купил", "купила", "купили", "купить",
+                "заплатил", "заплатила", "заплатили",
+                "трата", "траты", "расход", "расходы",
+                "получил", "получила", "получили",
+                "заработал", "заработала", "заработали",
+                "доход", "зарплата", "зарплату", "прибыль",
+                "добавь", "добавить", "запиши", "записать", "внеси"
+            };
+            
+            bool hasTransactionKeyword = transactionKeywords.Any(k => messageLower.Contains(k));
+            
+            // Check for amounts (numbers + currency)
+            var amountPatterns = new[]
+            {
+                @"\d+\s*(рубл|rub|₽|р\.|руб)",
+                @"\d+\s*(тысяч|тыс|к)",
+                @"\d+\s*(доллар|usd|\$|бакс)",
+                @"\d+\s*(евро|eur|€)"
+            };
+            
+            bool hasAmount = amountPatterns.Any(p => 
+                System.Text.RegularExpressions.Regex.IsMatch(messageLower, p, System.Text.RegularExpressions.RegexOptions.IgnoreCase));
+            
+            return hasTransactionKeyword || hasAmount;
         }
 
         private async void OnSendMessage(object? sender, EventArgs e)
@@ -195,41 +233,55 @@ namespace FinanceAssistant
 
             try
             {
-                var result = await _financeService.ExtractTransactionsFromMessageAsync(message);
-
-                MessagesContainer.Children.Remove(loadingView);
-
-                if (result.Transactions != null && result.Transactions.Count > 0)
+                // Determine if message is about transactions or general chat
+                if (IsTransactionMessage(message))
                 {
-                    var botResponse = CreateBotMessageView(result.Analysis ?? "Я извлек следующие транзакции:");
-                    MessagesContainer.Children.Add(botResponse);
-                    ScrollToBottom();
+                    // Handle as transaction extraction
+                    var result = await _financeService.ExtractTransactionsFromMessageAsync(message);
+                    MessagesContainer.Children.Remove(loadingView);
 
-                    foreach (var extractedTransaction in result.Transactions)
+                    if (result.Transactions != null && result.Transactions.Count > 0)
                     {
-                        if (extractedTransaction != null)
+                        var botResponse = CreateBotMessageView(result.Analysis ?? "Я извлек следующие транзакции:");
+                        MessagesContainer.Children.Add(botResponse);
+                        ScrollToBottom();
+
+                        foreach (var extractedTransaction in result.Transactions)
                         {
-                            var transactionView = CreateTransactionPreviewView(extractedTransaction, result);
-                            MessagesContainer.Children.Add(transactionView);
+                            if (extractedTransaction != null)
+                            {
+                                var transactionView = CreateTransactionPreviewView(extractedTransaction, result);
+                                MessagesContainer.Children.Add(transactionView);
+                                ScrollToBottom();
+                            }
+                        }
+
+                        if (result.Warnings != null && result.Warnings.Count > 0)
+                        {
+                            var warningsView = CreateWarningMessageView(result.Warnings);
+                            MessagesContainer.Children.Add(warningsView);
                             ScrollToBottom();
                         }
                     }
-
-                    if (result.Warnings != null && result.Warnings.Count > 0)
+                    else
                     {
-                        var warningsView = CreateWarningMessageView(result.Warnings);
-                        MessagesContainer.Children.Add(warningsView);
+                        var noTransactionsView = CreateBotMessageView(
+                            result.Analysis ?? "Не удалось извлечь транзакции.\n\n" +
+                            "Попробуйте указать сумму явно, например:\n" +
+                            "'Потратил 500 рублей на еду'"
+                        );
+                        MessagesContainer.Children.Add(noTransactionsView);
                         ScrollToBottom();
                     }
                 }
                 else
                 {
-                    var noTransactionsView = CreateBotMessageView(
-                        result.Analysis ?? "Не удалось извлечь транзакции.\n\n" +
-                        "Попробуйте указать сумму явно, например:\n" +
-                        "'Потратил 500 рублей на еду'"
-                    );
-                    MessagesContainer.Children.Add(noTransactionsView);
+                    // Handle as general chat message
+                    var chatResult = await _financeService.SendChatMessageAsync(message);
+                    MessagesContainer.Children.Remove(loadingView);
+
+                    var botResponse = CreateBotMessageView(chatResult.Response);
+                    MessagesContainer.Children.Add(botResponse);
                     ScrollToBottom();
                 }
             }
