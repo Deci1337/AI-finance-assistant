@@ -2,14 +2,14 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="FinanceAssistant.ChatPage"
-             BackgroundColor="{StaticResource BackgroundDark}"
+             BackgroundColor="{DynamicResource BackgroundDark}"
              Shell.NavBarIsVisible="False">
 
     <Grid RowDefinitions="Auto,Auto,*,Auto">
         
         <!-- Header with back button and settings -->
         <Grid Grid.Row="0" Padding="20,50,20,10" ColumnDefinitions="Auto,*,Auto">
-            <Border BackgroundColor="{StaticResource BackgroundElevated}"
+            <Border BackgroundColor="{DynamicResource BackgroundElevated}"
                     StrokeShape="RoundRectangle 20"
                     Stroke="Transparent"
                     HeightRequest="40"
@@ -18,7 +18,7 @@
                     <TapGestureRecognizer Tapped="OnBackTapped"/>
                 </Border.GestureRecognizers>
                 <Label Text="&lt;"
-                       TextColor="{StaticResource TextPrimary}"
+                       TextColor="{DynamicResource TextPrimary}"
                        FontSize="20"
                        HorizontalOptions="Center"
                        VerticalOptions="Center"/>
@@ -26,7 +26,7 @@
             
             <Label Grid.Column="1"
                    Text="AI Ассистент"
-                   TextColor="{StaticResource TextPrimary}"
+                   TextColor="{DynamicResource TextPrimary}"
                    FontSize="20"
                    FontAttributes="Bold"
                    HorizontalOptions="Center"
@@ -38,7 +38,7 @@
             
             <!-- Settings button -->
             <Border Grid.Column="2"
-                    BackgroundColor="{StaticResource BackgroundElevated}"
+                    BackgroundColor="{DynamicResource BackgroundElevated}"
                     StrokeShape="RoundRectangle 20"
                     Stroke="Transparent"
                     HeightRequest="40"
@@ -47,7 +47,7 @@
                     <TapGestureRecognizer Tapped="OnSettingsTapped"/>
                 </Border.GestureRecognizers>
                 <Label Text="*"
-                       TextColor="{StaticResource TextPrimary}"
+                       TextColor="{DynamicResource TextPrimary}"
                        FontSize="20"
                        HorizontalOptions="Center"
                        VerticalOptions="Center"/>
@@ -56,7 +56,7 @@
 
         <!-- Connection status -->
         <Border Grid.Row="1"
-                BackgroundColor="{StaticResource BackgroundCard}"
+                BackgroundColor="{DynamicResource BackgroundCard}"
                 Padding="15,10"
                 Margin="20,0">
             <Border.StrokeShape>
@@ -65,11 +65,11 @@
             <HorizontalStackLayout Spacing="10" HorizontalOptions="Center">
                 <Label x:Name="ConnectionStatusLabel"
                        Text="Сервер: localhost:8000"
-                       TextColor="{StaticResource TextSecondary}"
+                       TextColor="{DynamicResource TextSecondary}"
                        FontSize="12"/>
                 <Label x:Name="ConnectionIndicator"
                        Text="*"
-                       TextColor="{StaticResource TextMuted}"
+                       TextColor="{DynamicResource TextMuted}"
                        FontSize="12"/>
             </HorizontalStackLayout>
         </Border>
@@ -85,13 +85,13 @@
 
         <!-- Input Area -->
         <Border Grid.Row="3"
-                BackgroundColor="{StaticResource BackgroundCard}"
+                BackgroundColor="{DynamicResource BackgroundCard}"
                 Padding="15,10">
             <Grid ColumnDefinitions="Auto,*,Auto,Auto">
                 <!-- Microphone Button -->
                 <Border x:Name="MicrophoneButton"
                         Grid.Column="0"
-                        BackgroundColor="{StaticResource BackgroundElevated}"
+                        BackgroundColor="{DynamicResource BackgroundElevated}"
                         StrokeShape="RoundRectangle 20"
                         Stroke="Transparent"
                         HeightRequest="45"
@@ -102,7 +102,7 @@
                     </Border.GestureRecognizers>
                     <Label x:Name="MicrophoneIcon"
                            Text="🎤"
-                           TextColor="{StaticResource TextPrimary}"
+                           TextColor="{DynamicResource TextPrimary}"
                            FontSize="20"
                            HorizontalOptions="Center"
                            VerticalOptions="Center"/>
@@ -111,16 +111,16 @@
                 <Entry x:Name="MessageEntry"
                        Grid.Column="1"
                        Placeholder="Купил хлеб за 50 рублей..."
-                       PlaceholderColor="{StaticResource TextSecondary}"
-                       TextColor="{StaticResource TextPrimary}"
-                       BackgroundColor="{StaticResource BackgroundElevated}"
+                       PlaceholderColor="{DynamicResource TextSecondary}"
+                       TextColor="{DynamicResource TextPrimary}"
+                       BackgroundColor="{DynamicResource BackgroundElevated}"
                        FontSize="14"
                        Completed="OnSendMessage"/>
                 
                 <Button Grid.Column="2"
                         Text=">"
                         BackgroundColor="{StaticResource Primary}"
-                        TextColor="{StaticResource BackgroundDark}"
+                        TextColor="{DynamicResource BackgroundDark}"
                         FontSize="18"
                         FontAttributes="Bold"
                         WidthRequest="50"

@@ -53,8 +53,8 @@ namespace FinanceAssistant.Pages
 
         private View CreateCategoryChip(Category category, bool isSelected)
         {
-            var bgColor = isSelected ? Color.FromArgb(category.ColorHex) : Color.FromArgb("#21262D");
-            var textColor = isSelected ? Color.FromArgb("#0D1117") : Color.FromArgb("#8B949E");
+            var bgColor = isSelected ? Color.FromArgb(category.ColorHex) : ThemeService.GetBackgroundElevated();
+            var textColor = isSelected ? Color.FromArgb("#0D1117") : ThemeService.GetTextSecondary();
 
             var border = new Border
             {
@@ -98,8 +98,8 @@ namespace FinanceAssistant.Pages
             IncomeTab.BackgroundColor = Colors.Transparent;
             
             if (ExpenseTab.Content is Label expenseLabel)
-                expenseLabel.TextColor = Color.FromArgb("#FFFFFF");
-            IncomeTabLabel.TextColor = Color.FromArgb("#8B949E");
+                expenseLabel.TextColor = Colors.White;
+            IncomeTabLabel.TextColor = ThemeService.GetTextSecondary();
 
             _selectedCategory = null;
             await LoadCategoriesAsync();
@@ -118,7 +118,7 @@ namespace FinanceAssistant.Pages
             IncomeTabLabel.FontAttributes = FontAttributes.Bold;
             
             if (ExpenseTab.Content is Label expenseLabel)
-                expenseLabel.TextColor = Color.FromArgb("#8B949E");
+                expenseLabel.TextColor = ThemeService.GetTextSecondary();
 
             _selectedCategory = null;
             await LoadCategoriesAsync();
@@ -138,9 +138,9 @@ namespace FinanceAssistant.Pages
 
         private void UpdateImportanceUI()
         {
-            var inactiveColor = Color.FromArgb("#21262D");
+            var inactiveColor = ThemeService.GetBackgroundElevated();
             var activeColor = Color.FromArgb("#00D09E");
-            var inactiveTextColor = Color.FromArgb("#8B949E");
+            var inactiveTextColor = ThemeService.GetTextSecondary();
             var activeTextColor = Color.FromArgb("#0D1117");
 
             ImportanceLow.BackgroundColor = _currentImportance == ImportanceLevel.Low ? activeColor : inactiveColor;
