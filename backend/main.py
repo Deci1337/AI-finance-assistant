@@ -12,19 +12,65 @@ import os
 from typing import Dict, List, Optional
 from datetime import datetime
 from mock_data import get_mock_portfolio, calculate_portfolio_metrics
-from gigachat_integration import (
-    analyze_emotions_with_fallback, 
-    generate_financial_advice_with_fallback,
-    generate_comprehensive_advice_with_fallback, 
-    extract_transactions_with_fallback,
-    transcribe_audio_with_fallback,
-    analyze_friendliness_with_fallback,
-    generate_insights_with_fallback,
-    generate_forecast_with_fallback,
-    get_access_token,
-    chat_completion,
-    GigaChatAIClient
-)
+
+# Импорт Gemini интеграции
+try:
+    from gemini_integration import (
+        chat_completion_for_chat as chat_completion,
+        get_access_token,
+        GeminiAIClient
+    )
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+    print("Warning: Gemini integration not available, using fallback functions")
+
+# Fallback функции для AI интеграций
+def analyze_emotions_with_fallback(text: str, context: Optional[str] = None) -> Dict:
+    """Простой анализ эмоций (fallback)"""
+    return {"emotions": {"joy": 0.3, "fear": 0.1, "anger": 0.1, "sadness": 0.1, "surprise": 0.1, "neutral": 0.3}}
+
+def generate_financial_advice_with_fallback(portfolio_data: Dict, analysis_type: str = "full") -> Dict:
+    """Простая генерация финансовых советов (fallback)"""
+    return {"recommendations": ["Регулярно пересматривайте портфель", "Диверсифицируйте инвестиции"]}
+
+def generate_comprehensive_advice_with_fallback(user_message: str, portfolio_data: Optional[Dict] = None, context: Optional[str] = None) -> Dict:
+    """Простая генерация комплексных советов (fallback)"""
+    return {"comprehensive_analysis": "Для получения детального анализа рекомендуется настроить AI интеграцию"}
+
+def extract_transactions_with_fallback(user_message: str, context: Optional[str] = None) -> Dict:
+    """Простое извлечение транзакций (fallback)"""
+    import re
+    amounts = re.findall(r'(\d+)\s*(?:рубл|руб|₽)', user_message, re.IGNORECASE)
+    transactions = []
+    for amount in amounts[:5]:
+        transactions.append({
+            "type": "expense",
+            "title": user_message[:50],
+            "amount": float(amount[0]),
+            "category": "Other",
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "confidence": 0.5
+        })
+    return {"transactions": transactions, "extracted_info": {}, "analysis": "", "questions": [], "warnings": []}
+
+def transcribe_audio_with_fallback(audio_data: bytes, audio_format: str = "wav") -> Optional[str]:
+    """Распознавание речи (fallback - не поддерживается)"""
+    return None
+
+def analyze_friendliness_with_fallback(text: str) -> Dict:
+    """Простой анализ дружелюбности (fallback)"""
+    return {"friendliness_score": 0.5, "sentiment": "neutral", "timestamp": datetime.now().isoformat()}
+
+def generate_insights_with_fallback(transactions: List[Dict], current_month: Optional[str] = None) -> Optional[Dict]:
+    """Простая генерация инсайтов (fallback)"""
+    if not transactions:
+        return None
+    return {"insight": "Проанализируйте свои транзакции для получения инсайтов", "category": "Other"}
+
+def generate_forecast_with_fallback(transactions: List[Dict], user_message: str, months: int = 3) -> Optional[Dict]:
+    """Простая генерация прогноза (fallback)"""
+    return {"category": "Other", "description": "Для получения прогноза настройте AI интеграцию"}
 
 # Создание экземпляра FastAPI приложения
 app = FastAPI(
@@ -224,16 +270,6 @@ class ForecastResponse(BaseModel):
     timestamp: Optional[str] = None  # Временная метка
 
 
-# Хранение токена GigaChat (кэширование)
-_gigachat_token: Optional[str] = None
-
-
-def get_gigachat_token() -> Optional[str]:
-    """Получить или обновить токен GigaChat"""
-    global _gigachat_token
-    if _gigachat_token is None:
-        _gigachat_token = get_access_token()
-    return _gigachat_token
 
 
 # Базовые роуты
@@ -282,7 +318,7 @@ async def analyze_portfolio(request: PortfolioAnalysisRequest) -> PortfolioAnaly
         # Вычисляем метрики портфеля
         metrics = calculate_portfolio_metrics(portfolio_data)
         
-        # Генерируем рекомендации через GigaChat с fallback
+        # Генерируем рекомендации через AI с fallback
         ai_advice = generate_financial_advice_with_fallback(portfolio_data, request.analysis_type)
         
         # Извлекаем данные из ответа AI
@@ -345,14 +381,14 @@ async def analyze_emotions(request: EmotionsAnalysisRequest) -> EmotionsAnalysis
     - Общий сентимент-скор
     """
     try:
-        # Анализ эмоций через GigaChat с fallback на простой анализ
+        # Анализ эмоций через AI с fallback на простой анализ
         result = analyze_emotions_with_fallback(request.text, request.context)
         
         # Извлекаем данные из ответа
         if isinstance(result, dict) and "emotions" in result:
             emotions = result["emotions"]
-            analysis = result.get("analysis")
-            questions = result.get("questions")
+            analysis = result["analysis"]
+            questions = result["questions"]
             recommendations = result.get("recommendations")
         else:
             emotions = result if isinstance(result, dict) else {}
@@ -573,9 +609,14 @@ async def analyze_friendliness(request: FriendlinessRequest) -> FriendlinessResp
     try:
         result = analyze_friendliness_with_fallback(request.message)
         
+        score = result.get("friendliness_score", 0.5)
+        sentiment = result.get("sentiment", "neutral")
+        
+        print(f"Friendliness endpoint returning: score={score}, sentiment={sentiment}")
+        
         return FriendlinessResponse(
-            friendliness_score=result.get("friendliness_score", 0.5),
-            sentiment=result.get("sentiment", "neutral"),
+            friendliness_score=score,
+            sentiment=sentiment,
             timestamp=result.get("timestamp", datetime.now().isoformat())
         )
     except Exception as e:
@@ -625,111 +666,108 @@ async def get_insights(request: InsightRequest) -> InsightResponse:
 @app.post("/chat", response_model=ChatResponse)
 async def chat_with_ai(request: ChatRequest) -> ChatResponse:
     """
-    Чат с ИИ-ассистентом (GigaChat)
+    Чат с ИИ-ассистентом (Gemini)
     
-    Отправляет сообщение пользователя в GigaChat и возвращает ответ.
+    Отправляет сообщение пользователя в Gemini и возвращает ответ.
     Контекст может включать информацию о финансах пользователя.
     """
     try:
-        token = get_gigachat_token()
-        if not token:
-            # Если токен не получен, возвращаем заглушку
-            return ChatResponse(
-                response="Извините, сервис временно недоступен. Попробуйте позже.",
-                timestamp=datetime.now().isoformat()
-            )
-        
         # Формируем системный промпт для финансового ассистента
-        system_context = """Ты - AI-ассистент по личным финансам внутри веб-приложения.
+        system_context = """Ты - дружелюбный AI-ассистент по личным финансам. Твоё имя - Финансовый Помощник.
 
-У тебя есть история расходов пользователя по месяцам и категориям (например: доставка еды, покупки, услуги).
-Каждая транзакция содержит: date, amount, category.
-Система уже посчитала для тебя агрегированные суммы по месяцам и категориям.
+ВАЖНО: Отвечай на вопрос пользователя напрямую! Не начинай анализировать расходы, если тебя об этом не просят.
 
-ТВОИ ЗАДАЧИ:
+ЧТО ТЫ УМЕЕШЬ:
+1. Вести обычный диалог и отвечать на вопросы
+2. Помогать с финансовыми вопросами и давать советы
+3. Анализировать расходы (только если пользователь просит)
+4. Делать прогнозы трат (только если пользователь просит)
+5. Отвечать на общие вопросы
 
-1. СИМУЛЯЦИЯ БУДУЩИХ РАСХОДОВ:
-   Пользователь может задать вопрос вида:
-   - "Что будет в январе, если я уменьшу траты на доставку на 30%?"
-   - "Если я буду тратить на еду на 2000 рублей меньше каждый месяц, сколько сэкономлю за полгода?"
-   - "Покажи прогноз на 3 месяца, если сократить развлечения на 25%"
-   
-   На вход ты получаешь:
-   - Базовый сценарий (средние месячные траты по категориям за последние N месяцев из контекста)
-   - Желаемые изменения (процент или фиксированная сумма по одной или нескольким категориям из вопроса пользователя)
-   - Горизонт прогноза (количество месяцев из вопроса пользователя, если не указано - используй 1 месяц)
-   
-   Ты возвращаешь:
-   - Прогнозируемые траты по месяцам в новом сценарии (покажи помесячно)
-   - Общую сумму экономии за период
-   - Короткое текстовое объяснение на понятном языке (2-4 предложения)
-   
-   Пример ответа:
-   "Если уменьшить траты на доставку на 30%, то:
-   - Январь: 35000 руб (было 40000, экономия 5000)
-   - Февраль: 35000 руб (экономия 5000)
-   - Март: 35000 руб (экономия 5000)
-   Общая экономия за 3 месяца: 15000 руб.
-   Вы сможете сэкономить 5000 рублей в месяц, отказавшись от части заказов доставки. Это составит 15% от ваших текущих расходов на эту категорию."
+КОГДА АНАЛИЗИРОВАТЬ РАСХОДЫ:
+Делай анализ расходов ТОЛЬКО если пользователь явно просит:
+- "проанализируй мои расходы"
+- "где я могу сэкономить"
+- "на что я трачу больше всего"
+- "покажи статистику"
+- вопросы про прогноз или симуляцию расходов
 
-2. ПОИСК КАТЕГОРИЙ, КОТОРЫЕ ИМЕЕТ СМЫСЛ СОКРАТИТЬ:
-   Если пользователь не предлагает сценарий сам, ты анализируешь его историю и:
-   - Находишь категории с наибольшими расходами (топ-3)
-   - Находишь категории, которые заметно выросли по сравнению со средним (например, на 20-30% и больше)
-   - Предлагаешь 2-3 конкретных совета в формате:
-     "Ты тратишь на доставку X ₽ в месяц (Y% всех расходов). Если снизить на 25%, ты сэкономишь Z ₽ за 3 месяца."
-   
-   Пример ответа:
-   "Анализ ваших расходов показывает:
-   1. Доставка еды: 12000 руб/мес (30% всех расходов). Если снизить на 25%, сэкономите 3000 руб/мес (9000 за 3 месяца).
-   2. Развлечения: 8000 руб/мес (20% всех расходов), выросли на 35% по сравнению со средним. Если вернуться к среднему уровню, сэкономите 2800 руб/мес.
-   3. Транспорт: 6000 руб/мес (15% всех расходов). Если оптимизировать на 20%, сэкономите 1200 руб/мес."
+КОГДА НЕ АНАЛИЗИРОВАТЬ РАСХОДЫ:
+- Приветствия ("привет", "здравствуй")
+- Общие вопросы ("как дела", "что умеешь")
+- Вопросы не связанные с анализом ("что такое инфляция", "как накопить")
+- Благодарности ("спасибо")
+
+ПРИМЕРЫ ПРАВИЛЬНЫХ ОТВЕТОВ:
+
+Пользователь: "Привет"
+Ответ: "Привет! Я твой финансовый помощник. Могу помочь с учётом расходов, анализом трат или ответить на вопросы о финансах. Чем могу помочь?"
+
+Пользователь: "Что ты умеешь?"
+Ответ: "Я могу помочь тебе с:
+- Учётом доходов и расходов
+- Анализом трат по категориям
+- Прогнозом расходов
+- Советами по экономии
+- Ответами на финансовые вопросы
+Просто напиши, что тебя интересует!"
+
+Пользователь: "Проанализируй мои расходы"
+Ответ: [здесь делаешь анализ на основе контекста]
 
 ОГРАНИЧЕНИЯ:
-- НЕ придумывай фейковые данные, используй ТОЛЬКО те агрегаты и параметры сценария, которые тебе передал бэкенд в контексте
-- Если данных мало для адекватного прогноза (например, только один месяц), явно напиши об этом и всё равно сделай простой линейный прогноз без сложной математики
-- НЕ давай юридических, налоговых или инвестиционных советов
-- Фокус ТОЛЬКО на экономии и перераспределении расходов
-- Не давай финансовых или инвестиционных рекомендаций
+- НЕ придумывай данные о расходах пользователя
+- Если нет данных для анализа, скажи об этом
+- НЕ давай юридических или налоговых советов
 
-ФОРМАТ ДАННЫХ:
-В контексте могут быть предоставлены:
-- Агрегированные суммы по месяцам и категориям
-- Средние месячные траты по категориям
-- История транзакций
-Используй ТОЛЬКО эти данные для расчетов.
-
-Отвечай на русском языке, кратко, конкретно, с числами и расчетами."""
+Отвечай на русском языке, дружелюбно и по делу."""
         
         # Добавляем контекст пользователя если есть
         full_message = request.message
         if request.context:
-            full_message = f"""КОНТЕКСТ ФИНАНСОВЫХ ДАННЫХ ПОЛЬЗОВАТЕЛЯ:
+            full_message = f"""ДАННЫЕ ПОЛЬЗОВАТЕЛЯ (используй только если пользователь просит анализ):
 {request.context}
 
-ВОПРОС ПОЛЬЗОВАТЕЛЯ: {request.message}
+СООБЩЕНИЕ ПОЛЬЗОВАТЕЛЯ: {request.message}
 
-ИНСТРУКЦИЯ: Используй данные из контекста выше для расчетов. Если в контексте есть агрегированные суммы по месяцам и категориям, используй их как базовый сценарий. Если есть история транзакций, можешь их проанализировать для поиска категорий для сокращения."""
+ВАЖНО: Отвечай на сообщение пользователя напрямую. Используй данные выше только если пользователь явно просит анализ расходов."""
         else:
-            full_message = f"ВОПРОС ПОЛЬЗОВАТЕЛЯ: {request.message}\n\nПримечание: Для выполнения расчетов и симуляций нужны данные о транзакциях или агрегированные суммы по месяцам и категориям. Попроси пользователя предоставить эту информацию или используй данные из истории расходов."
+            full_message = f"СООБЩЕНИЕ ПОЛЬЗОВАТЕЛЯ: {request.message}"
         
-        # Отправляем запрос в GigaChat
-        result = chat_completion(token, f"{system_context}\n\n{full_message}")
+        # Используем Gemini если доступен
+        if GEMINI_AVAILABLE:
+            try:
+                token = get_access_token()
+                if token:
+                    result = chat_completion(token, f"{system_context}\n\n{full_message}")
+                    
+                    if 'error' not in result:
+                        ai_response = result.get('choices', [{}])[0].get('message', {}).get('content', 'Не удалось получить ответ.')
+                        return ChatResponse(
+                            response=ai_response,
+                            timestamp=datetime.now().isoformat()
+                        )
+            except Exception as e:
+                print(f"Gemini API error: {e}")
         
-        if 'error' in result:
-            # Сбрасываем токен при ошибке авторизации
-            global _gigachat_token
-            _gigachat_token = None
-            return ChatResponse(
-                response="Произошла ошибка при обработке запроса. Попробуйте ещё раз.",
-                timestamp=datetime.now().isoformat()
-            )
+        # Fallback на простые ответы
+        message_lower = request.message.lower()
         
-        # Извлекаем ответ из результата
-        ai_response = result.get('choices', [{}])[0].get('message', {}).get('content', 'Не удалось получить ответ.')
+        if any(word in message_lower for word in ["привет", "здравствуй", "добрый день"]):
+            response_text = "Привет! Я твой финансовый помощник. Могу помочь с учётом расходов, анализом трат или ответить на вопросы о финансах. Чем могу помочь?"
+        elif any(word in message_lower for word in ["что умеешь", "помощь", "help"]):
+            response_text = """Я могу помочь тебе с:
+- Учётом доходов и расходов
+- Анализом трат по категориям
+- Прогнозом расходов
+- Советами по экономии
+- Ответами на финансовые вопросы
+Просто напиши, что тебя интересует!"""
+        else:
+            response_text = "Для полноценной работы чата необходимо настроить AI интеграцию (например, Gemini). Сейчас доступны только базовые функции."
         
         return ChatResponse(
-            response=ai_response,
+            response=response_text,
             timestamp=datetime.now().isoformat()
         )
     except Exception as e:
