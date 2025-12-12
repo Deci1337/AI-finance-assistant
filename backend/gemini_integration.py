@@ -170,6 +170,6 @@ def get_access_token() -> Optional[str]:
     return GEMINI_API_KEY
 
 
-def chat_completion_for_chat(token: str, full_message: str) -> Dict:
+def chat_completion_for_chat(token: str, full_message: str, system_message: Optional[str] = None) -> Dict:
     """Функция для совместимости с main.py"""
-    return chat_completion(full_message)
+    return chat_completion(full_message, system_message=system_message)

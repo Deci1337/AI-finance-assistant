@@ -38,21 +38,174 @@ def generate_comprehensive_advice_with_fallback(user_message: str, portfolio_dat
     """Простая генерация комплексных советов (fallback)"""
     return {"comprehensive_analysis": "Для получения детального анализа рекомендуется настроить AI интеграцию"}
 
-def extract_transactions_with_fallback(user_message: str, context: Optional[str] = None) -> Dict:
-    """Простое извлечение транзакций (fallback)"""
+def extract_transactions_hybrid(user_message: str, context: Optional[str] = None) -> Dict:
+    """
+    Гибридный метод извлечения транзакций:
+    1. Использует ключевые слова для быстрого распознавания простых случаев
+    2. Использует Gemini AI для улучшения результатов и обработки сложных случаев
+    """
     import re
-    amounts = re.findall(r'(\d+)\s*(?:рубл|руб|₽)', user_message, re.IGNORECASE)
-    transactions = []
-    for amount in amounts[:5]:
-        transactions.append({
-            "type": "expense",
-            "title": user_message[:50],
-            "amount": float(amount[0]),
-            "category": "Other",
-            "date": datetime.now().strftime("%Y-%m-%d"),
-            "confidence": 0.5
-        })
-    return {"transactions": transactions, "extracted_info": {}, "analysis": "", "questions": [], "warnings": []}
+    import json
+    
+    # Шаг 1: Быстрое распознавание по ключевым словам
+    keyword_transactions = []
+    # Улучшенное регулярное выражение для поиска сумм (с разными вариантами написания)
+    amounts = re.findall(r'(\d+(?:\s*\d+)*(?:[.,]\d+)?)\s*(?:рубл|руб|₽|р\.?|рублей|рубля)', user_message, re.IGNORECASE)
+    # Также ищем числа без валюты, если они рядом с ключевыми словами расходов/доходов
+    if not amounts:
+        amounts = re.findall(r'(?:потратил|купил|заплатил|получил|на|за)\s+(\d+(?:\s*\d+)*(?:[.,]\d+)?)', user_message, re.IGNORECASE)
+    
+    # Ключевые слова для типов транзакций
+    income_keywords = ['получил', 'зарплат', 'доход', 'прибыл', 'начислил', 'перевел', 'поступил']
+    expense_keywords = ['купил', 'потратил', 'покупка', 'расход', 'оплатил', 'заплатил', 'затрат']
+    
+    # Определение типа транзакции по ключевым словам
+    message_lower = user_message.lower()
+    is_income = any(keyword in message_lower for keyword in income_keywords)
+    is_expense = any(keyword in message_lower for keyword in expense_keywords)
+    
+    # Категории по ключевым словам
+    categories_map = {
+        'еда': ['хлеб', 'молоко', 'продукт', 'еда', 'обед', 'ужин', 'завтрак', 'кафе', 'ресторан', 'магазин'],
+        'транспорт': ['такси', 'метро', 'автобус', 'транспорт', 'бензин', 'заправка'],
+        'развлечения': ['кино', 'театр', 'концерт', 'развлечен', 'игра'],
+        'здоровье': ['лекарств', 'врач', 'больница', 'аптека', 'здоровье'],
+        'коммунальные': ['коммунал', 'электричество', 'вода', 'газ', 'интернет', 'телефон'],
+        'одежда': ['одежд', 'обувь', 'магазин одежд'],
+        'образование': ['образован', 'курс', 'учеба', 'школа', 'университет']
+    }
+    
+    detected_category = "Other"
+    for category, keywords in categories_map.items():
+        if any(keyword in message_lower for keyword in keywords):
+            detected_category = category
+            break
+    
+    # Создание транзакций по ключевым словам
+    for amount_str in amounts[:5]:
+        try:
+            amount = float(amount_str.replace(',', '.'))
+            transaction_type = "income" if is_income and not is_expense else "expense"
+            
+            # Извлечение названия (первые слова до суммы или после ключевых слов)
+            title = user_message[:50].strip()
+            if len(user_message) > 50:
+                title = user_message[:50] + "..."
+            
+            keyword_transactions.append({
+                "type": transaction_type,
+                "title": title,
+                "amount": amount,
+                "category": detected_category,
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "confidence": 0.6,  # Средняя уверенность для ключевых слов
+                "method": "keywords"
+            })
+        except ValueError:
+            continue
+    
+    # Шаг 2: Улучшение через Gemini AI (используем AI всегда, если доступен)
+    if GEMINI_AVAILABLE:
+        try:
+            # Формируем промпт для AI
+            prompt = f"""Проанализируй следующее сообщение пользователя и извлеки информацию о финансовых транзакциях.
+
+Сообщение: "{user_message}"
+{f"Контекст: {context}" if context else ""}
+
+Найденные транзакции по ключевым словам:
+{json.dumps(keyword_transactions, ensure_ascii=False, indent=2)}
+
+Задача:
+1. Если найдены транзакции по ключевым словам - проверь их правильность и улучши
+2. Если транзакций не найдено - найди их в тексте самостоятельно
+3. Улучши категории, если они неточны
+4. Добавь недостающие транзакции, если они есть в тексте
+5. Исправь типы транзакций (доход/расход), если они неправильные
+6. Извлеки точные названия/описания транзакций
+7. Определи дату, если она указана
+
+Верни JSON в следующем формате:
+{{
+  "transactions": [
+    {{
+      "type": "income" или "expense",
+      "title": "точное название транзакции",
+      "amount": число,
+      "category": "категория из списка: Еда, Транспорт, Развлечения, Здоровье, Коммунальные, Одежда, Образование, Другое",
+      "date": "YYYY-MM-DD или сегодняшняя дата",
+      "confidence": число от 0.0 до 1.0
+    }}
+  ],
+  "analysis": "краткий анализ транзакций",
+  "questions": ["вопросы для уточнения, если нужно"],
+  "warnings": ["предупреждения, если есть"]
+}}
+
+Отвечай ТОЛЬКО валидным JSON, без дополнительного текста."""
+
+            token = get_access_token()
+            if token:
+                ai_result = chat_completion(token, prompt)
+                
+                if 'error' not in ai_result:
+                    ai_response = ai_result.get('choices', [{}])[0].get('message', {}).get('content', '')
+                    
+                    # Парсим JSON ответ от AI
+                    try:
+                        # Убираем markdown код блоки, если есть
+                        ai_response = ai_response.strip()
+                        if ai_response.startswith('```'):
+                            ai_response = ai_response.split('```')[1]
+                            if ai_response.startswith('json'):
+                                ai_response = ai_response[4:]
+                        ai_response = ai_response.strip()
+                        
+                        ai_data = json.loads(ai_response)
+                        
+                        # Объединяем результаты: используем AI результаты, но сохраняем keyword транзакции как fallback
+                        ai_transactions = ai_data.get('transactions', [])
+                        
+                        # Улучшаем транзакции: используем AI если есть, иначе keyword
+                        final_transactions = []
+                        if ai_transactions:
+                            # Используем AI результаты
+                            for ai_tx in ai_transactions:
+                                ai_tx['confidence'] = min(0.95, ai_tx.get('confidence', 0.8) + 0.1)  # Повышаем уверенность
+                                ai_tx['method'] = 'ai_enhanced'
+                                final_transactions.append(ai_tx)
+                        else:
+                            # Fallback на keyword транзакции
+                            final_transactions = keyword_transactions
+                        
+                        return {
+                            "transactions": final_transactions,
+                            "extracted_info": {},
+                            "analysis": ai_data.get('analysis', ''),
+                            "questions": ai_data.get('questions', []),
+                            "warnings": ai_data.get('warnings', []),
+                            "method": "hybrid_ai"
+                        }
+                    except json.JSONDecodeError:
+                        # Если не удалось распарсить JSON, используем keyword результаты
+                        pass
+        except Exception as e:
+            print(f"Ошибка при улучшении через AI: {e}")
+    
+    # Fallback: возвращаем результаты по ключевым словам
+    return {
+        "transactions": keyword_transactions if keyword_transactions else [],
+        "extracted_info": {},
+        "analysis": f"Найдено {len(keyword_transactions)} транзакций по ключевым словам",
+        "questions": [],
+        "warnings": [],
+        "method": "keywords_only"
+    }
+
+
+def extract_transactions_with_fallback(user_message: str, context: Optional[str] = None) -> Dict:
+    """Гибридное извлечение транзакций (ключевые слова + AI)"""
+    return extract_transactions_hybrid(user_message, context)
 
 def transcribe_audio_with_fallback(audio_data: bytes, audio_format: str = "wav") -> Optional[str]:
     """Распознавание речи (fallback - не поддерживается)"""
@@ -739,7 +892,7 @@ async def chat_with_ai(request: ChatRequest) -> ChatResponse:
             try:
                 token = get_access_token()
                 if token:
-                    result = chat_completion(token, f"{system_context}\n\n{full_message}")
+                    result = chat_completion(token, full_message, system_message=system_context)
                     
                     if 'error' not in result:
                         ai_response = result.get('choices', [{}])[0].get('message', {}).get('content', 'Не удалось получить ответ.')
@@ -747,6 +900,8 @@ async def chat_with_ai(request: ChatRequest) -> ChatResponse:
                             response=ai_response,
                             timestamp=datetime.now().isoformat()
                         )
+                    else:
+                        print(f"Gemini API returned error: {result.get('error', 'unknown')} - {result.get('message', 'no message')}")
             except Exception as e:
                 print(f"Gemini API error: {e}")
         
@@ -763,6 +918,11 @@ async def chat_with_ai(request: ChatRequest) -> ChatResponse:
 - Советами по экономии
 - Ответами на финансовые вопросы
 Просто напиши, что тебя интересует!"""
+        elif any(word in message_lower for word in ["анализ", "аналитик", "статистик", "трат", "расход", "затрат", "сделай аналитику", "проанализируй"]):
+            if request.context:
+                response_text = "Для анализа ваших расходов необходимо настроить AI интеграцию (например, Gemini). Сейчас доступны только базовые функции."
+            else:
+                response_text = "Для анализа расходов мне нужны данные о ваших транзакциях. Пожалуйста, добавьте несколько транзакций через интерфейс приложения."
         else:
             response_text = "Для полноценной работы чата необходимо настроить AI интеграцию (например, Gemini). Сейчас доступны только базовые функции."
         
