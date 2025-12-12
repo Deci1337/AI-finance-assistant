@@ -901,7 +901,15 @@ async def chat_with_ai(request: ChatRequest) -> ChatResponse:
                             timestamp=datetime.now().isoformat()
                         )
                     else:
-                        print(f"Gemini API returned error: {result.get('error', 'unknown')} - {result.get('message', 'no message')}")
+                        error_type = result.get('error', 'unknown')
+                        error_message = result.get('message', 'Неизвестная ошибка')
+                        print(f"Gemini API returned error: {error_type} - {error_message}")
+                        
+                        if error_type == 'quota_exceeded':
+                            return ChatResponse(
+                                response=error_message,
+                                timestamp=datetime.now().isoformat()
+                            )
             except Exception as e:
                 print(f"Gemini API error: {e}")
         

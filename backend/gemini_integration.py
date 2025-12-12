@@ -88,7 +88,25 @@ def chat_completion(message: str, model: str = None, temperature: float = 0.7, m
                 error_code = error_data.get('code', response.getcode())
                 
                 if error_code == 429 or 'quota' in error_msg.lower():
-                    return {'error': 'quota_exceeded', 'message': f'Превышена квота Gemini API: {error_msg}', 'model_used': model}
+                    wait_time = None
+                    if 'retry in' in error_msg.lower() or 'retry after' in error_msg.lower():
+                        wait_match = re.search(r'(\d+)', error_msg)
+                        if wait_match:
+                            wait_time = int(wait_match.group(1))
+                    
+                    quota_message = "Превышена квота Gemini API.\n\n"
+                    quota_message += "Бесплатный лимит Gemini - 20 запросов в минуту.\n\n"
+                    
+                    if wait_time:
+                        quota_message += f"Подождите ~{wait_time} секунд или:\n"
+                    else:
+                        quota_message += "Подождите ~40 секунд или:\n"
+                    
+                    quota_message += "1. Подождать - квота обновляется каждую минуту\n"
+                    quota_message += "2. Использовать другой API ключ - можно создать новый на https://aistudio.google.com\n"
+                    quota_message += "3. Улучшить обработку ошибок - чтобы показывать понятное сообщение"
+                    
+                    return {'error': 'quota_exceeded', 'message': quota_message, 'model_used': model, 'wait_time': wait_time}
                 elif 'location' in error_msg.lower() or 'region' in error_msg.lower():
                     return {'error': 'location_not_supported', 'message': 'Gemini API недоступен в вашем регионе. Используйте VPN или проверьте доступность API.', 'model_used': model}
                 elif 'insufficient' in error_msg.lower() or 'balance' in error_msg.lower():
@@ -111,7 +129,25 @@ def chat_completion(message: str, model: str = None, temperature: float = 0.7, m
             error_msg = f'HTTP {e.code}'
         
         if e.code == 429:
-            return {'error': 'quota_exceeded', 'message': f'Превышена квота Gemini API: {error_msg}', 'model_used': model or GEMINI_MODEL}
+            wait_time = None
+            if 'retry in' in error_msg.lower() or 'retry after' in error_msg.lower():
+                wait_match = re.search(r'(\d+)', error_msg)
+                if wait_match:
+                    wait_time = int(wait_match.group(1))
+            
+            quota_message = "Превышена квота Gemini API.\n\n"
+            quota_message += "Бесплатный лимит Gemini - 20 запросов в минуту.\n\n"
+            
+            if wait_time:
+                quota_message += f"Подождите ~{wait_time} секунд или:\n"
+            else:
+                quota_message += "Подождите ~40 секунд или:\n"
+            
+            quota_message += "1. Подождать - квота обновляется каждую минуту\n"
+            quota_message += "2. Использовать другой API ключ - можно создать новый на https://aistudio.google.com\n"
+            quota_message += "3. Улучшить обработку ошибок - чтобы показывать понятное сообщение"
+            
+            return {'error': 'quota_exceeded', 'message': quota_message, 'model_used': model or GEMINI_MODEL, 'wait_time': wait_time}
         elif e.code == 401:
             return {'error': 'unauthorized', 'message': 'Неверный API ключ Gemini', 'model_used': model or GEMINI_MODEL}
         else:
