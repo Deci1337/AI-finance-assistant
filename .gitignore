@@ -53,3 +53,11 @@ yarn-error.log*
 
 # Logs
 *.log
+
+# Excluded projects
+frontend/FullStackAppTest/
+
+# .NET build artifacts
+**/bin/
+**/obj/
+*.user

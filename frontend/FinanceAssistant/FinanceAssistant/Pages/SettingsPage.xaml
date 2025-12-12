@@ -195,12 +195,12 @@
                                FontSize="14"
                                FontAttributes="Bold"/>
                         
-                        <Label Text="Finance Assistant"
+                        <Label Text="FinAI - Your own finance assistant"
                                TextColor="{DynamicResource TextPrimary}"
                                FontSize="18"
                                FontAttributes="Bold"/>
                         
-                        <Label Text="Версия 1.0.0"
+                        <Label Text="Версия 0.0.1"
                                TextColor="{DynamicResource TextSecondary}"
                                FontSize="14"/>
                         

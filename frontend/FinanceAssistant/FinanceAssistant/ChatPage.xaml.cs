@@ -592,6 +592,10 @@ namespace FinanceAssistant
                 HorizontalOptions = LayoutOptions.Start,
                 VerticalOptions = LayoutOptions.Start
             };
+            
+            // Get theme colors
+            var bubbleColor = ThemeService.GetBackgroundElevated();
+            var textColor = ThemeService.GetTextPrimary();
 
             // Avatar
             var avatarBorder = new Border
@@ -618,7 +622,7 @@ namespace FinanceAssistant
             // Message bubble
             var border = new Border
             {
-                BackgroundColor = Color.FromArgb("#161B22"),
+                BackgroundColor = bubbleColor,
                 StrokeShape = new RoundRectangle { CornerRadius = 15 },
                 Stroke = Brush.Transparent,
                 Padding = new Thickness(15),
@@ -628,7 +632,7 @@ namespace FinanceAssistant
             var label = new Label
             {
                 Text = message,
-                TextColor = Color.FromArgb("#FFFFFF"),
+                TextColor = textColor,
                 FontSize = 14
             };
 
@@ -672,7 +676,7 @@ namespace FinanceAssistant
             // Loading bubble
             var border = new Border
             {
-                BackgroundColor = Color.FromArgb("#161B22"),
+                BackgroundColor = ThemeService.GetBackgroundElevated(),
                 StrokeShape = new RoundRectangle { CornerRadius = 15 },
                 Stroke = Brush.Transparent,
                 Padding = new Thickness(15),
@@ -695,7 +699,7 @@ namespace FinanceAssistant
         {
             var border = new Border
             {
-                BackgroundColor = Color.FromArgb("#21262D"),
+                BackgroundColor = ThemeService.GetBackgroundElevated(),
                 StrokeShape = new RoundRectangle { CornerRadius = 15 },
                 Stroke = Brush.Transparent,
                 Padding = new Thickness(15),
@@ -716,7 +720,7 @@ namespace FinanceAssistant
             var titleLabel = new Label
             {
                 Text = extractedTransaction.Title,
-                TextColor = Color.FromArgb("#FFFFFF"),
+                TextColor = ThemeService.GetTextPrimary(),
                 FontSize = 16,
                 FontAttributes = FontAttributes.Bold
             };
@@ -742,7 +746,7 @@ namespace FinanceAssistant
             var categoryLabel = new Label
             {
                 Text = $"{extractedTransaction.Category} • {extractedTransaction.Date}",
-                TextColor = Color.FromArgb("#8B949E"),
+                TextColor = ThemeService.GetTextSecondary(),
                 FontSize = 12
             };
 
@@ -754,7 +758,7 @@ namespace FinanceAssistant
                 var descLabel = new Label
                 {
                     Text = extractedTransaction.Description,
-                    TextColor = Color.FromArgb("#8B949E"),
+                    TextColor = ThemeService.GetTextSecondary(),
                     FontSize = 12
                 };
                 stack.Children.Add(descLabel);
@@ -918,7 +922,7 @@ namespace FinanceAssistant
                         
                         _isRecording = false;
                         MicrophoneIcon.Text = "🎤";
-                        MicrophoneButton.BackgroundColor = Color.FromArgb("#21262D");
+                        MicrophoneButton.BackgroundColor = ThemeService.GetBackgroundElevated();
                         
                         // Remove status message
                         if (_recordingStatusMessage != null)
@@ -936,7 +940,7 @@ namespace FinanceAssistant
             {
                 _isRecording = false;
                 MicrophoneIcon.Text = "🎤";
-                MicrophoneButton.BackgroundColor = Color.FromArgb("#21262D");
+                MicrophoneButton.BackgroundColor = ThemeService.GetBackgroundElevated();
                 
                 var errorMessage = CreateBotMessageView($"❌ Ошибка записи: {ex.Message}");
                 MessagesContainer.Children.Add(errorMessage);
