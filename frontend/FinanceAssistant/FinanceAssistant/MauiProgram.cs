@@ -21,6 +21,8 @@ namespace FinanceAssistant
             // Register services
             builder.Services.AddSingleton<DatabaseService>();
             builder.Services.AddSingleton<FinanceService>(); // API service for backend
+            builder.Services.AddSingleton<AchievementService>(); // Achievement tracking
+            builder.Services.AddSingleton<ThemeService>(); // Theme management
 
             // Register pages for DI
             builder.Services.AddTransient<MainPage>();
@@ -29,6 +31,7 @@ namespace FinanceAssistant
             builder.Services.AddTransient<ProfilePage>();
             builder.Services.AddTransient<StatisticsPage>();
             builder.Services.AddTransient<ChatPage>(); // AI Transaction extraction chat
+            builder.Services.AddTransient<SettingsPage>(); // Settings page
 
 #if DEBUG
             builder.Logging.AddDebug();

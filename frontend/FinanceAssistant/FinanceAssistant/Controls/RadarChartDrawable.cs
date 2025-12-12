@@ -15,8 +15,8 @@ namespace FinanceAssistant.Controls
         public void Draw(ICanvas canvas, RectF dirtyRect)
         {
             var centerX = dirtyRect.Width / 2;
-            var centerY = dirtyRect.Height / 2;
-            var radius = Math.Min(centerX, centerY) - 50;
+            var centerY = dirtyRect.Height / 2 + 15; // Offset down for legend
+            var radius = Math.Min(centerX, centerY) - 35; // Reduced padding for larger chart
 
             // Get all unique categories
             var allCategories = ExpenseData.Select(e => e.CategoryName)
@@ -205,4 +205,6 @@ namespace FinanceAssistant.Controls
         }
     }
 }
+
+
 

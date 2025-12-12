@@ -2,14 +2,14 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="FinanceAssistant.Pages.ProfilePage"
-             BackgroundColor="{StaticResource BackgroundDark}"
+             BackgroundColor="{DynamicResource BackgroundDark}"
              Shell.NavBarIsVisible="False">
 
     <Grid RowDefinitions="Auto,*">
         
         <!-- Header -->
         <Grid Grid.Row="0" Padding="20,50,20,20" ColumnDefinitions="Auto,*">
-            <Border BackgroundColor="{StaticResource BackgroundElevated}"
+            <Border BackgroundColor="{DynamicResource BackgroundElevated}"
                     StrokeShape="RoundRectangle 20"
                     Stroke="Transparent"
                     HeightRequest="40"
@@ -18,7 +18,7 @@
                     <TapGestureRecognizer Tapped="OnBackTapped"/>
                 </Border.GestureRecognizers>
                 <Label Text="&lt;"
-                       TextColor="{StaticResource TextPrimary}"
+                       TextColor="{DynamicResource TextPrimary}"
                        FontSize="20"
                        HorizontalOptions="Center"
                        VerticalOptions="Center"/>
@@ -26,7 +26,7 @@
             
             <Label Grid.Column="1"
                    Text="Профиль"
-                   TextColor="{StaticResource TextPrimary}"
+                   TextColor="{DynamicResource TextPrimary}"
                    FontSize="20"
                    FontAttributes="Bold"
                    HorizontalOptions="Center"
@@ -48,7 +48,7 @@
                             HorizontalOptions="Center">
                         <Label x:Name="AvatarLabel"
                                Text="U"
-                               TextColor="{StaticResource BackgroundDark}"
+                               TextColor="{DynamicResource BackgroundDark}"
                                FontSize="40"
                                FontAttributes="Bold"
                                HorizontalOptions="Center"
@@ -57,20 +57,20 @@
                     
                     <Label x:Name="UserNameDisplay"
                            Text="User"
-                           TextColor="{StaticResource TextPrimary}"
+                           TextColor="{DynamicResource TextPrimary}"
                            FontSize="24"
                            FontAttributes="Bold"
                            HorizontalOptions="Center"/>
                 </VerticalStackLayout>
 
                 <!-- Friendliness Card -->
-                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                <Border BackgroundColor="{DynamicResource BackgroundCard}"
                         StrokeShape="RoundRectangle 20"
                         Stroke="Transparent"
                         Padding="20">
                     <VerticalStackLayout Spacing="15">
                         <Label Text="Ваша дружелюбность"
-                               TextColor="{StaticResource TextSecondary}"
+                               TextColor="{DynamicResource TextSecondary}"
                                FontSize="14"/>
                         
                         <!-- Friendliness Labels -->
@@ -82,7 +82,7 @@
                             <Label x:Name="FriendlinessValueLabel"
                                    Grid.Column="1"
                                    Text="Нейтрально"
-                                   TextColor="{StaticResource TextPrimary}"
+                                   TextColor="{DynamicResource TextPrimary}"
                                    FontSize="16"
                                    FontAttributes="Bold"
                                    HorizontalOptions="Center"/>
@@ -127,25 +127,25 @@
                         <!-- Messages analyzed -->
                         <Label x:Name="MessagesAnalyzedLabel"
                                Text="На основе 0 сообщений"
-                               TextColor="{StaticResource TextMuted}"
+                               TextColor="{DynamicResource TextMuted}"
                                FontSize="11"
                                HorizontalOptions="Center"/>
                     </VerticalStackLayout>
                 </Border>
 
                 <!-- Nickname Input -->
-                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                <Border BackgroundColor="{DynamicResource BackgroundCard}"
                         StrokeShape="RoundRectangle 20"
                         Stroke="Transparent"
                         Padding="20">
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Никнейм"
-                               TextColor="{StaticResource TextSecondary}"
+                               TextColor="{DynamicResource TextSecondary}"
                                FontSize="14"/>
                         <Entry x:Name="NicknameEntry"
                                Placeholder="Введите ваш никнейм"
-                               PlaceholderColor="{StaticResource TextMuted}"
-                               TextColor="{StaticResource TextPrimary}"
+                               PlaceholderColor="{DynamicResource TextMuted}"
+                               TextColor="{DynamicResource TextPrimary}"
                                FontSize="16"
                                BackgroundColor="Transparent"
                                TextChanged="OnNicknameChanged"/>
@@ -155,7 +155,7 @@
                 <!-- Total Stats Cards -->
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="15">
                     <!-- Total Earned -->
-                    <Border BackgroundColor="{StaticResource BackgroundCard}"
+                    <Border BackgroundColor="{DynamicResource BackgroundCard}"
                             StrokeShape="RoundRectangle 20"
                             Stroke="Transparent"
                             Padding="20">
@@ -175,7 +175,7 @@
                                        VerticalOptions="Center"/>
                             </Border>
                             <Label Text="Всего получено"
-                                   TextColor="{StaticResource TextSecondary}"
+                                   TextColor="{DynamicResource TextSecondary}"
                                    FontSize="12"/>
                             <Label x:Name="TotalEarnedLabel"
                                    Text="0 RUB"
@@ -187,7 +187,7 @@
                     
                     <!-- Total Spent -->
                     <Border Grid.Column="1"
-                            BackgroundColor="{StaticResource BackgroundCard}"
+                            BackgroundColor="{DynamicResource BackgroundCard}"
                             StrokeShape="RoundRectangle 20"
                             Stroke="Transparent"
                             Padding="20">
@@ -207,7 +207,7 @@
                                        VerticalOptions="Center"/>
                             </Border>
                             <Label Text="Всего потрачено"
-                                   TextColor="{StaticResource TextSecondary}"
+                                   TextColor="{DynamicResource TextSecondary}"
                                    FontSize="12"/>
                             <Label x:Name="TotalSpentLabel"
                                    Text="0 RUB"
@@ -219,7 +219,7 @@
                 </Grid>
 
                 <!-- Balance Card -->
-                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                <Border BackgroundColor="{DynamicResource BackgroundCard}"
                         StrokeShape="RoundRectangle 20"
                         Stroke="Transparent"
                         Padding="20">
@@ -239,7 +239,7 @@
                         </Border>
                         <VerticalStackLayout VerticalOptions="Center">
                             <Label Text="Текущий баланс"
-                                   TextColor="{StaticResource TextSecondary}"
+                                   TextColor="{DynamicResource TextSecondary}"
                                    FontSize="14"/>
                             <Label x:Name="BalanceLabel"
                                    Text="0 RUB"
@@ -251,46 +251,46 @@
                 </Border>
 
                 <!-- Additional Stats -->
-                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                <Border BackgroundColor="{DynamicResource BackgroundCard}"
                         StrokeShape="RoundRectangle 20"
                         Stroke="Transparent"
                         Padding="20">
                     <VerticalStackLayout Spacing="15">
                         <Label Text="Информация об аккаунте"
-                               TextColor="{StaticResource TextSecondary}"
+                               TextColor="{DynamicResource TextSecondary}"
                                FontSize="14"/>
                         
                         <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" RowSpacing="15">
                             <VerticalStackLayout>
                                 <Label x:Name="TotalTransactionsLabel"
                                        Text="0"
-                                       TextColor="{StaticResource TextPrimary}"
+                                       TextColor="{DynamicResource TextPrimary}"
                                        FontSize="24"
                                        FontAttributes="Bold"/>
                                 <Label Text="Транзакций"
-                                       TextColor="{StaticResource TextSecondary}"
+                                       TextColor="{DynamicResource TextSecondary}"
                                        FontSize="12"/>
                             </VerticalStackLayout>
                             
                             <VerticalStackLayout Grid.Column="1">
                                 <Label x:Name="TotalCategoriesLabel"
                                        Text="0"
-                                       TextColor="{StaticResource TextPrimary}"
+                                       TextColor="{DynamicResource TextPrimary}"
                                        FontSize="24"
                                        FontAttributes="Bold"/>
                                 <Label Text="Категорий"
-                                       TextColor="{StaticResource TextSecondary}"
+                                       TextColor="{DynamicResource TextSecondary}"
                                        FontSize="12"/>
                             </VerticalStackLayout>
                             
                             <VerticalStackLayout Grid.Row="1" Grid.ColumnSpan="2">
                                 <Label x:Name="MemberSinceLabel"
                                        Text="-"
-                                       TextColor="{StaticResource TextPrimary}"
+                                       TextColor="{DynamicResource TextPrimary}"
                                        FontSize="16"
                                        FontAttributes="Bold"/>
                                 <Label Text="Дата регистрации"
-                                       TextColor="{StaticResource TextSecondary}"
+                                       TextColor="{DynamicResource TextSecondary}"
                                        FontSize="12"/>
                             </VerticalStackLayout>
                         </Grid>
@@ -312,55 +312,79 @@
                         <TapGestureRecognizer Tapped="OnSaveTapped"/>
                     </Border.GestureRecognizers>
                     <Label Text="Сохранить"
-                           TextColor="{StaticResource BackgroundDark}"
+                           TextColor="{DynamicResource BackgroundDark}"
                            FontSize="18"
                            FontAttributes="Bold"
                            HorizontalOptions="Center"/>
                 </Border>
 
-                <!-- Dev Tools Section -->
-                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                <!-- Achievements Section -->
+                <Border BackgroundColor="{DynamicResource BackgroundCard}"
                         StrokeShape="RoundRectangle 20"
                         Stroke="Transparent"
                         Padding="20">
                     <VerticalStackLayout Spacing="15">
-                        <Label Text="Инструменты разработчика"
-                               TextColor="{StaticResource TextSecondary}"
-                               FontSize="14"/>
-                        
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                            <!-- Generate Test Data -->
-                            <Border BackgroundColor="#2D5A27"
-                                    StrokeShape="RoundRectangle 15"
-                                    Stroke="Transparent"
-                                    Padding="15,12">
-                                <Border.GestureRecognizers>
-                                    <TapGestureRecognizer Tapped="OnGenerateTestDataTapped"/>
-                                </Border.GestureRecognizers>
-                                <Label Text="+ Тест данные"
-                                       TextColor="{StaticResource TextPrimary}"
-                                       FontSize="14"
-                                       FontAttributes="Bold"
-                                       HorizontalOptions="Center"/>
-                            </Border>
-                            
-                            <!-- Clear All Data -->
-                            <Border Grid.Column="1"
-                                    BackgroundColor="#5A2727"
-                                    StrokeShape="RoundRectangle 15"
-                                    Stroke="Transparent"
-                                    Padding="15,12">
-                                <Border.GestureRecognizers>
-                                    <TapGestureRecognizer Tapped="OnClearDataTapped"/>
-                                </Border.GestureRecognizers>
-                                <Label Text="Очистить"
-                                       TextColor="{StaticResource TextPrimary}"
-                                       FontSize="14"
-                                       FontAttributes="Bold"
-                                       HorizontalOptions="Center"/>
-                            </Border>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="Достижения"
+                                   TextColor="{DynamicResource TextPrimary}"
+                                   FontSize="18"
+                                   FontAttributes="Bold"/>
+                            <Label x:Name="AchievementsCountLabel"
+                                   Grid.Column="1"
+                                   Text="0/5"
+                                   TextColor="{DynamicResource TextSecondary}"
+                                   FontSize="14"
+                                   VerticalOptions="Center"/>
                         </Grid>
+                        
+                        <!-- Achievements Grid -->
+                        <FlexLayout x:Name="AchievementsContainer"
+                                    Wrap="Wrap"
+                                    JustifyContent="Start"
+                                    AlignItems="Start">
+                            <!-- Achievements will be added dynamically -->
+                        </FlexLayout>
                     </VerticalStackLayout>
+                </Border>
+
+                <!-- Settings Button -->
+                <Border BackgroundColor="{DynamicResource BackgroundCard}"
+                        StrokeShape="RoundRectangle 20"
+                        Stroke="Transparent"
+                        Padding="20">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSettingsTapped"/>
+                    </Border.GestureRecognizers>
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="15">
+                        <Border BackgroundColor="{DynamicResource BackgroundElevated}"
+                                StrokeShape="RoundRectangle 12"
+                                Stroke="Transparent"
+                                HeightRequest="44"
+                                WidthRequest="44">
+                            <Label Text="G"
+                                   TextColor="{StaticResource Primary}"
+                                   FontSize="20"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"
+                                   VerticalOptions="Center"/>
+                        </Border>
+                        
+                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                            <Label Text="Настройки"
+                                   TextColor="{DynamicResource TextPrimary}"
+                                   FontSize="16"
+                                   FontAttributes="Bold"/>
+                            <Label Text="Тема, данные и другое"
+                                   TextColor="{DynamicResource TextSecondary}"
+                                   FontSize="12"/>
+                        </VerticalStackLayout>
+                        
+                        <Label Grid.Column="2"
+                               Text=">"
+                               TextColor="{DynamicResource TextSecondary}"
+                               FontSize="20"
+                               VerticalOptions="Center"/>
+                    </Grid>
                 </Border>
 
                 <BoxView HeightRequest="30" Color="Transparent"/>

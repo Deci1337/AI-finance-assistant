@@ -10,13 +10,15 @@ namespace FinanceAssistant
     {
         private readonly DatabaseService _databaseService;
         private readonly FinanceService _financeService;
+        private readonly AchievementService _achievementService;
         private readonly FinanceChartDrawable _chartDrawable;
 
-        public MainPage(DatabaseService databaseService, FinanceService financeService)
+        public MainPage(DatabaseService databaseService, FinanceService financeService, AchievementService achievementService)
         {
             InitializeComponent();
             _databaseService = databaseService;
             _financeService = financeService;
+            _achievementService = achievementService;
             _chartDrawable = new FinanceChartDrawable();
             ChartView.Drawable = _chartDrawable;
         }
@@ -25,6 +27,122 @@ namespace FinanceAssistant
         {
             base.OnAppearing();
             await LoadDataAsync();
+            
+            // Show any pending achievements
+            await ShowPendingAchievementsAsync();
+        }
+        
+        private async Task ShowPendingAchievementsAsync()
+        {
+            while (_achievementService.HasPendingAchievements)
+            {
+                var achievement = _achievementService.GetNextPendingAchievement();
+                if (achievement != null)
+                {
+                    await ShowAchievementNotificationAsync(achievement);
+                }
+            }
+        }
+        
+        private async Task ShowAchievementNotificationAsync(Achievement achievement)
+        {
+            // Create notification popup
+            var notification = new Border
+            {
+                BackgroundColor = Color.FromArgb("#1F2937"),
+                StrokeShape = new RoundRectangle { CornerRadius = 20 },
+                Stroke = Color.FromArgb("#00D09E"),
+                StrokeThickness = 2,
+                Padding = new Thickness(20, 15),
+                HorizontalOptions = LayoutOptions.Center,
+                VerticalOptions = LayoutOptions.End,
+                Margin = new Thickness(20, 0, 20, 120),
+                TranslationY = 200,
+                Opacity = 0,
+                ZIndex = 999
+            };
+
+            notification.Shadow = new Shadow
+            {
+                Brush = Color.FromArgb("#00D09E"),
+                Offset = new Point(0, 0),
+                Radius = 20,
+                Opacity = 0.6f
+            };
+
+            var content = new HorizontalStackLayout
+            {
+                Spacing = 15,
+                HorizontalOptions = LayoutOptions.Center
+            };
+
+            var emoji = new Label
+            {
+                Text = achievement.Emoji,
+                FontSize = 36,
+                VerticalOptions = LayoutOptions.Center
+            };
+
+            var textStack = new VerticalStackLayout
+            {
+                Spacing = 2,
+                VerticalOptions = LayoutOptions.Center
+            };
+
+            textStack.Children.Add(new Label
+            {
+                Text = "Достижение получено!",
+                FontSize = 12,
+                TextColor = Color.FromArgb("#00D09E"),
+                FontAttributes = FontAttributes.Bold
+            });
+
+            textStack.Children.Add(new Label
+            {
+                Text = achievement.Name,
+                FontSize = 18,
+                TextColor = Colors.White,
+                FontAttributes = FontAttributes.Bold
+            });
+
+            textStack.Children.Add(new Label
+            {
+                Text = achievement.Description,
+                FontSize = 12,
+                TextColor = Color.FromArgb("#9CA3AF")
+            });
+            
+            content.Children.Add(emoji);
+            content.Children.Add(textStack);
+            notification.Content = content;
+
+            // Add to page
+            if (Content is Grid grid)
+            {
+                grid.Children.Add(notification);
+                Grid.SetRowSpan(notification, 99);
+            }
+
+            // Animate in
+            await Task.WhenAll(
+                notification.TranslateTo(0, 0, 400, Easing.SpringOut),
+                notification.FadeTo(1, 300)
+            );
+
+            // Wait
+            await Task.Delay(3500);
+
+            // Animate out
+            await Task.WhenAll(
+                notification.TranslateTo(0, 200, 300, Easing.CubicIn),
+                notification.FadeTo(0, 300)
+            );
+
+            // Remove
+            if (Content is Grid g)
+            {
+                g.Children.Remove(notification);
+            }
         }
 
         private async Task LoadDataAsync()
@@ -111,7 +229,7 @@ namespace FinanceAssistant
                 var emptyLabel = new Label
                 {
                     Text = "Пока нет транзакций. Нажми + чтобы добавить!",
-                    TextColor = Color.FromArgb("#8B949E"),
+                    TextColor = ThemeService.GetTextSecondary(),
                     FontSize = 14,
                     HorizontalOptions = LayoutOptions.Center,
                     Margin = new Thickness(0, 20)
@@ -137,7 +255,7 @@ namespace FinanceAssistant
 
             var border = new Border
             {
-                BackgroundColor = Color.FromArgb("#161B22"),
+                BackgroundColor = ThemeService.GetBackgroundCard(),
                 StrokeShape = new RoundRectangle { CornerRadius = 15 },
                 Stroke = Brush.Transparent,
                 Padding = new Thickness(15)
@@ -185,7 +303,7 @@ namespace FinanceAssistant
             var titleLabel = new Label
             {
                 Text = transaction.Title,
-                TextColor = Color.FromArgb("#FFFFFF"),
+                TextColor = ThemeService.GetTextPrimary(),
                 FontSize = 16,
                 FontAttributes = FontAttributes.Bold
             };
@@ -195,7 +313,7 @@ namespace FinanceAssistant
             var categoryLabel = new Label
             {
                 Text = $"{categoryName} - {importanceText} - {transaction.Date:dd MMM}",
-                TextColor = Color.FromArgb("#8B949E"),
+                TextColor = ThemeService.GetTextSecondary(),
                 FontSize = 12
             };
 

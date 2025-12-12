@@ -14,17 +14,22 @@ namespace FinanceAssistant
     {
         private readonly FinanceService _financeService;
         private readonly DatabaseService _databaseService;
+        private readonly AchievementService _achievementService;
         private readonly IAudioManager _audioManager;
         private IAudioRecorder? _audioRecorder;
         private bool _isRecording = false;
         private View? _recordingStatusMessage = null;
 
-        public ChatPage(FinanceService financeService, DatabaseService databaseService)
+        public ChatPage(FinanceService financeService, DatabaseService databaseService, AchievementService achievementService)
         {
             InitializeComponent();
             _financeService = financeService;
             _databaseService = databaseService;
+            _achievementService = achievementService;
             _audioManager = AudioManager.Current;
+            
+            // Subscribe to achievement events
+            _achievementService.AchievementEarned += OnAchievementEarned;
             
             AddWelcomeMessage();
             UpdateConnectionStatus($"Сервер: {_financeService.GetCurrentServerUrl()}", false);
@@ -255,15 +260,32 @@ namespace FinanceAssistant
         {
             var messageLower = message.ToLower();
             
+            // Question patterns - should NOT be treated as transaction input
+            var questionPatterns = new[]
+            {
+                "сколько я потратил", "сколько я потратила", "сколько потратил", "сколько потратила",
+                "сколько я заработал", "сколько я заработала", "сколько заработал", "сколько заработала",
+                "сколько я получил", "сколько я получила", "сколько получил", "сколько получила",
+                "покажи расходы", "покажи траты", "покажи доходы",
+                "мои расходы", "мои траты", "мои доходы",
+                "за месяц", "за неделю", "за день", "за год",
+                "за октябрь", "за ноябрь", "за декабрь", "за январь", "за февраль", "за март",
+                "за апрель", "за май", "за июнь", "за июль", "за август", "за сентябрь",
+                "какие расходы", "какие траты", "какие доходы",
+                "статистика", "анализ расходов", "анализ трат"
+            };
+            
+            // If message is a question about spending, don't treat as transaction
+            if (questionPatterns.Any(p => messageLower.Contains(p)))
+                return false;
+            
             var transactionKeywords = new[]
             {
                 "потратил", "потратила", "потратили",
                 "купил", "купила", "купили", "купить",
                 "заплатил", "заплатила", "заплатили",
-                "трата", "траты", "расход", "расходы",
                 "получил", "получила", "получили",
                 "заработал", "заработала", "заработали",
-                "доход", "зарплата", "зарплату", "прибыль",
                 "добавь", "добавить", "запиши", "записать", "внеси"
             };
             
@@ -280,7 +302,8 @@ namespace FinanceAssistant
             bool hasAmount = amountPatterns.Any(p => 
                 Regex.IsMatch(messageLower, p, RegexOptions.IgnoreCase));
             
-            return hasTransactionKeyword || hasAmount;
+            // Transaction needs BOTH a keyword AND an amount (to distinguish from questions)
+            return hasTransactionKeyword && hasAmount;
         }
 
         private bool IsForecastMessage(string message)
@@ -317,6 +340,9 @@ namespace FinanceAssistant
 
             // Analyze friendliness in background
             _ = AnalyzeFriendlinessAsync(message);
+            
+            // Check for first AI message achievement
+            _ = _achievementService.CheckFirstAiMessageAsync();
 
             var loadingView = CreateLoadingMessageView();
             MessagesContainer.Children.Add(loadingView);
@@ -420,6 +446,112 @@ namespace FinanceAssistant
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error analyzing friendliness: {ex.Message}");
+            }
+        }
+
+        private void OnAchievementEarned(Achievement achievement)
+        {
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                await ShowAchievementNotificationAsync(achievement);
+            });
+        }
+
+        private async Task ShowAchievementNotificationAsync(Achievement achievement)
+        {
+            // Create notification popup
+            var notification = new Border
+            {
+                BackgroundColor = Color.FromArgb("#1F2937"),
+                StrokeShape = new RoundRectangle { CornerRadius = 20 },
+                Stroke = Color.FromArgb("#00D09E"),
+                StrokeThickness = 2,
+                Padding = new Thickness(20, 15),
+                HorizontalOptions = LayoutOptions.Center,
+                VerticalOptions = LayoutOptions.End,
+                Margin = new Thickness(20, 0, 20, 100),
+                TranslationY = 200,
+                Opacity = 0
+            };
+
+            var shadow = new Shadow
+            {
+                Brush = Color.FromArgb("#00D09E"),
+                Offset = new Point(0, 0),
+                Radius = 15,
+                Opacity = 0.5f
+            };
+            notification.Shadow = shadow;
+
+            var content = new HorizontalStackLayout
+            {
+                Spacing = 15,
+                HorizontalOptions = LayoutOptions.Center
+            };
+
+            var emoji = new Label
+            {
+                Text = achievement.Emoji,
+                FontSize = 32,
+                VerticalOptions = LayoutOptions.Center
+            };
+
+            var textStack = new VerticalStackLayout
+            {
+                Spacing = 2,
+                VerticalOptions = LayoutOptions.Center
+            };
+
+            var title = new Label
+            {
+                Text = "Достижение получено!",
+                FontSize = 12,
+                TextColor = Color.FromArgb("#00D09E"),
+                FontAttributes = FontAttributes.Bold
+            };
+
+            var name = new Label
+            {
+                Text = achievement.Name,
+                FontSize = 16,
+                TextColor = Colors.White,
+                FontAttributes = FontAttributes.Bold
+            };
+
+            textStack.Children.Add(title);
+            textStack.Children.Add(name);
+            
+            content.Children.Add(emoji);
+            content.Children.Add(textStack);
+            
+            notification.Content = content;
+
+            // Add to page
+            if (Content is Grid grid)
+            {
+                grid.Children.Add(notification);
+                Grid.SetRowSpan(notification, 99);
+            }
+
+            // Animate in
+            await Task.WhenAll(
+                notification.TranslateTo(0, 0, 300, Easing.CubicOut),
+                notification.FadeTo(1, 300)
+            );
+
+            // Wait
+            await Task.Delay(3000);
+
+            // Animate out
+            await Task.WhenAll(
+                notification.TranslateTo(0, 200, 300, Easing.CubicIn),
+                notification.FadeTo(0, 300)
+            );
+
+            // Remove
+            if (Content is Grid g)
+            {
+                g.Children.Remove(notification);
             }
         }
 
@@ -671,6 +803,9 @@ namespace FinanceAssistant
             };
 
             await _databaseService.SaveTransactionAsync(transaction);
+            
+            // Check for achievements
+            await _achievementService.CheckTransactionAchievementsAsync(transaction);
 
             var successView = CreateBotMessageView($"Транзакция '{transaction.Title}' успешно добавлена!");
             MessagesContainer.Children.Add(successView);

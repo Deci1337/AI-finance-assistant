@@ -25,8 +25,10 @@ namespace FinanceAssistant.Data
             await _database.CreateTableAsync<Category>();
             await _database.CreateTableAsync<UserProfile>();
             await _database.CreateTableAsync<ChatMessage>();
+            await _database.CreateTableAsync<Achievement>();
 
             await SeedDefaultDataAsync();
+            await SeedDefaultAchievementsAsync();
         }
 
         private async Task SeedDefaultDataAsync()
@@ -459,6 +461,22 @@ namespace FinanceAssistant.Data
             await _database!.DeleteAllAsync<Transaction>();
         }
 
+        // Clear ALL data (transactions, chat history, achievements, profile reset)
+        public async Task ClearAllDataAsync()
+        {
+            await InitAsync();
+            await _database!.DeleteAllAsync<Transaction>();
+            await _database!.DeleteAllAsync<ChatMessage>();
+            await _database!.DeleteAllAsync<Achievement>();
+            
+            // Reset profile to defaults
+            await _database!.DeleteAllAsync<UserProfile>();
+            await _database!.InsertAsync(new UserProfile { Name = "User", AvatarInitial = "U" });
+            
+            // Re-seed achievements
+            await SeedDefaultAchievementsAsync();
+        }
+
         // Chat history operations
         public async Task SaveChatMessageAsync(string message, bool isUser)
         {
@@ -499,6 +517,67 @@ namespace FinanceAssistant.Data
         {
             await InitAsync();
             await _database!.DeleteAllAsync<ChatMessage>();
+        }
+
+        // Achievement operations
+        private async Task SeedDefaultAchievementsAsync()
+        {
+            var achievements = await _database!.Table<Achievement>().CountAsync();
+            if (achievements == 0)
+            {
+                var defaultAchievements = AchievementDefinitions.GetAllDefinitions();
+                await _database.InsertAllAsync(defaultAchievements);
+            }
+        }
+
+        public async Task<List<Achievement>> GetAllAchievementsAsync()
+        {
+            await InitAsync();
+            return await _database!.Table<Achievement>().ToListAsync();
+        }
+
+        public async Task<List<Achievement>> GetEarnedAchievementsAsync()
+        {
+            await InitAsync();
+            return await _database!.Table<Achievement>()
+                .Where(a => a.IsEarned)
+                .OrderByDescending(a => a.EarnedAt)
+                .ToListAsync();
+        }
+
+        public async Task<Achievement?> GetAchievementByIdAsync(string achievementId)
+        {
+            await InitAsync();
+            return await _database!.Table<Achievement>()
+                .Where(a => a.AchievementId == achievementId)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<bool> EarnAchievementAsync(string achievementId)
+        {
+            await InitAsync();
+            var achievement = await GetAchievementByIdAsync(achievementId);
+            if (achievement == null || achievement.IsEarned)
+                return false;
+
+            achievement.IsEarned = true;
+            achievement.EarnedAt = DateTime.Now;
+            await _database!.UpdateAsync(achievement);
+            return true;
+        }
+
+        public async Task<bool> IsAchievementEarnedAsync(string achievementId)
+        {
+            await InitAsync();
+            var achievement = await GetAchievementByIdAsync(achievementId);
+            return achievement?.IsEarned ?? false;
+        }
+
+        public async Task ResetAchievementsAsync()
+        {
+            await InitAsync();
+            await _database!.DeleteAllAsync<Achievement>();
+            await SeedDefaultAchievementsAsync();
         }
     }
 }
