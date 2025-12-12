@@ -4,9 +4,15 @@ namespace FinanceAssistant
 {
     public partial class App : Application
     {
-        public App()
+        private readonly ThemeService _themeService;
+        
+        public App(ThemeService themeService)
         {
             InitializeComponent();
+            _themeService = themeService;
+            
+            // Initialize theme from preferences
+            _themeService.Initialize();
             
             // Запускаем backend при старте приложения автоматически
             _ = StartBackendAsync();

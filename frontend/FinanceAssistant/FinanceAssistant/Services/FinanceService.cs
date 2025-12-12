@@ -34,6 +34,84 @@ namespace FinanceAssistant.Services
             _apiBaseUrl = GetApiBaseUrl();
         }
 
+        public void SetServerUrl(string url)
+        {
+            _apiBaseUrl = url;
+            Preferences.Set("api_base_url", url);
+        }
+
+        public async Task<bool> CheckHealthAsync()
+        {
+            try
+            {
+                using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromSeconds(3);
+                var response = await client.GetAsync($"{_apiBaseUrl}/health");
+                return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public async Task<(bool success, string url)> FindWorkingServerAsync()
+        {
+            // IP адреса для поиска:
+            // - Мобильный хотспот Android: 192.168.43.x
+            // - Мобильный хотспот iOS: 172.20.10.x  
+            // - Стандартные роутеры: 192.168.0.x, 192.168.1.x
+            // - Android эмулятор: 10.0.2.2
+            
+            var urlsToTry = new List<string>
+            {
+                "http://localhost:8000",
+                "http://127.0.0.1:8000",
+                "http://10.0.2.2:8000",
+            };
+
+            // Добавляем IP для мобильного хотспота (192.168.43.x)
+            for (int i = 1; i <= 20; i++)
+            {
+                urlsToTry.Add($"http://192.168.43.{i}:8000");
+            }
+
+            // iOS hotspot (172.20.10.x)
+            for (int i = 1; i <= 15; i++)
+            {
+                urlsToTry.Add($"http://172.20.10.{i}:8000");
+            }
+
+            // Стандартные сети
+            for (int i = 1; i <= 10; i++)
+            {
+                urlsToTry.Add($"http://192.168.1.{i}:8000");
+                urlsToTry.Add($"http://192.168.0.{i}:8000");
+            }
+
+            foreach (var url in urlsToTry)
+            {
+                try
+                {
+                    using var client = new HttpClient();
+                    client.Timeout = TimeSpan.FromSeconds(2);
+                    var response = await client.GetAsync($"{url}/health");
+                    
+                    if (response.IsSuccessStatusCode)
+                    {
+                        SetServerUrl(url);
+                        return (true, url);
+                    }
+                }
+                catch
+                {
+                    // Continue to next URL
+                }
+            }
+
+            return (false, string.Empty);
+        }
+
         public async Task<TransactionExtractionResult> ExtractTransactionsFromMessageAsync(string message, string? context = null)
         {
             try
@@ -240,13 +318,64 @@ namespace FinanceAssistant.Services
 
             return null;
         }
+
+        public async Task<ForecastResult?> GetForecastAsync(List<Dictionary<string, object>> transactions, string userMessage, int months = 3)
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+                httpClient.Timeout = TimeSpan.FromSeconds(30);
+
+                var request = new
+                {
+                    transactions = transactions,
+                    user_message = userMessage,
+                    months = months
+                };
+
+                var json = JsonSerializer.Serialize(request);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await httpClient.PostAsync($"{_apiBaseUrl}/forecast", content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var result = JsonSerializer.Deserialize<ForecastResult>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    
+                    return result;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting forecast: {ex.Message}");
+            }
+
+            return null;
+        }
+    }
+
+    public class ForecastResult
+    {
+        public string? Category { get; set; }
+        public double? CurrentMonthly { get; set; }
+        public double? ChangePercent { get; set; }
+        public double? NewMonthly { get; set; }
+        public int? Months { get; set; }
+        public List<Dictionary<string, object>>? MonthlyForecast { get; set; }
+        public double? TotalSavings { get; set; }
+        public string? Description { get; set; }
+        public string? Timestamp { get; set; }
     }
 
     public class VoiceTranscriptionResult
     {
         public string Text { get; set; } = string.Empty;
         public string? Error { get; set; }
-        public double Confidence { get; set; }
+        public double? Confidence { get; set; }
     }
 
     public class ChatResult
@@ -257,8 +386,13 @@ namespace FinanceAssistant.Services
 
     public class FriendlinessResult
     {
+        [System.Text.Json.Serialization.JsonPropertyName("friendliness_score")]
         public double FriendlinessScore { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("sentiment")]
         public string Sentiment { get; set; } = string.Empty;
+        
+        [System.Text.Json.Serialization.JsonPropertyName("timestamp")]
         public string Timestamp { get; set; } = string.Empty;
     }
 
@@ -299,57 +433,6 @@ namespace FinanceAssistant.Services
         public double? LowImportancePercent { get; set; }
         public double? PreviousMonthAmount { get; set; }
         public double? PercentOfTotal { get; set; }
-        public string? Timestamp { get; set; }
-    }
-
-    public async Task<ForecastResult?> GetForecastAsync(List<Dictionary<string, object>> transactions, string userMessage, int months = 3)
-    {
-        try
-        {
-            using var httpClient = new HttpClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(30);
-
-            var request = new
-            {
-                transactions = transactions,
-                user_message = userMessage,
-                months = months
-            };
-
-            var json = JsonSerializer.Serialize(request);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            var response = await httpClient.PostAsync($"{_apiBaseUrl}/forecast", content);
-            
-            if (response.IsSuccessStatusCode)
-            {
-                var responseContent = await response.Content.ReadAsStringAsync();
-                var result = JsonSerializer.Deserialize<ForecastResult>(responseContent, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-                
-                return result;
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error getting forecast: {ex.Message}");
-        }
-
-        return null;
-    }
-
-    public class ForecastResult
-    {
-        public string? Category { get; set; }
-        public double? CurrentMonthly { get; set; }
-        public double? ChangePercent { get; set; }
-        public double? NewMonthly { get; set; }
-        public int? Months { get; set; }
-        public List<Dictionary<string, object>>? MonthlyForecast { get; set; }
-        public double? TotalSavings { get; set; }
-        public string? Description { get; set; }
         public string? Timestamp { get; set; }
     }
 }

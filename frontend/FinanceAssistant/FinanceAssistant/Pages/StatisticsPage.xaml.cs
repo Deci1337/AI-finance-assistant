@@ -1,6 +1,7 @@
 using FinanceAssistant.Controls;
 using FinanceAssistant.Data;
 using FinanceAssistant.Models;
+using FinanceAssistant.Services;
 
 namespace FinanceAssistant.Pages
 {
@@ -89,7 +90,7 @@ namespace FinanceAssistant.Pages
                 var nameLabel = new Label
                 {
                     Text = stat.CategoryName,
-                    TextColor = Color.FromArgb("#FFFFFF"),
+                    TextColor = ThemeService.GetTextPrimary(),
                     FontSize = 14,
                     Margin = new Thickness(10, 0, 0, 0),
                     VerticalOptions = LayoutOptions.Center
@@ -98,7 +99,7 @@ namespace FinanceAssistant.Pages
                 var percentLabel = new Label
                 {
                     Text = $"{percentage:F1}%",
-                    TextColor = Color.FromArgb("#8B949E"),
+                    TextColor = ThemeService.GetTextSecondary(),
                     FontSize = 14,
                     VerticalOptions = LayoutOptions.Center
                 };
@@ -124,7 +125,7 @@ namespace FinanceAssistant.Pages
                 var emptyLabel = new Label
                 {
                     Text = "Нет расходов за этот период",
-                    TextColor = Color.FromArgb("#8B949E"),
+                    TextColor = ThemeService.GetTextSecondary(),
                     FontSize = 14
                 };
                 TopExpensesList.Children.Add(emptyLabel);
@@ -135,7 +136,7 @@ namespace FinanceAssistant.Pages
             {
                 var border = new Border
                 {
-                    BackgroundColor = Color.FromArgb("#21262D"),
+                    BackgroundColor = ThemeService.GetBackgroundElevated(),
                     StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 12 },
                     Stroke = Brush.Transparent,
                     Padding = new Thickness(12)
@@ -181,7 +182,7 @@ namespace FinanceAssistant.Pages
                 var nameLabel = new Label
                 {
                     Text = stat.CategoryName,
-                    TextColor = Color.FromArgb("#FFFFFF"),
+                    TextColor = ThemeService.GetTextPrimary(),
                     FontSize = 14,
                     FontAttributes = FontAttributes.Bold
                 };
@@ -189,7 +190,7 @@ namespace FinanceAssistant.Pages
                 var countLabel = new Label
                 {
                     Text = $"{stat.Count} транзакций",
-                    TextColor = Color.FromArgb("#8B949E"),
+                    TextColor = ThemeService.GetTextSecondary(),
                     FontSize = 12
                 };
 

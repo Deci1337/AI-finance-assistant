@@ -1,17 +1,20 @@
 using FinanceAssistant.Data;
 using FinanceAssistant.Models;
+using FinanceAssistant.Services;
 
 namespace FinanceAssistant.Pages
 {
     public partial class ProfilePage : ContentPage
     {
         private readonly DatabaseService _databaseService;
+        private readonly AchievementService _achievementService;
         private UserProfile? _profile;
 
-        public ProfilePage(DatabaseService databaseService)
+        public ProfilePage(DatabaseService databaseService, AchievementService achievementService)
         {
             InitializeComponent();
             _databaseService = databaseService;
+            _achievementService = achievementService;
         }
 
         protected override async void OnAppearing()
@@ -45,17 +48,91 @@ namespace FinanceAssistant.Pages
 
             // Friendliness
             UpdateFriendlinessDisplay(_profile.Friendliness, _profile.MessagesAnalyzed);
+
+            // Achievements
+            await LoadAchievementsAsync();
+        }
+
+        private async Task LoadAchievementsAsync()
+        {
+            var achievements = await _achievementService.GetAllAchievementsAsync();
+            var earnedCount = achievements.Count(a => a.IsEarned);
+            
+            AchievementsCountLabel.Text = $"{earnedCount}/{achievements.Count}";
+            AchievementsContainer.Children.Clear();
+
+            foreach (var achievement in achievements)
+            {
+                var achievementView = CreateAchievementView(achievement);
+                AchievementsContainer.Children.Add(achievementView);
+            }
+        }
+
+        private View CreateAchievementView(Achievement achievement)
+        {
+            var isEarned = achievement.IsEarned;
+            
+            var container = new Border
+            {
+                BackgroundColor = isEarned 
+                    ? Color.FromArgb("#2D4A3E")  // Darker green for earned
+                    : Color.FromArgb("#2A2F3A"), // Gray for locked
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 15 },
+                Stroke = isEarned 
+                    ? Color.FromArgb("#00D09E")
+                    : Colors.Transparent,
+                StrokeThickness = isEarned ? 2 : 0,
+                Padding = new Thickness(12),
+                Margin = new Thickness(4),
+                WidthRequest = 72,
+                HeightRequest = 72
+            };
+
+            var stack = new VerticalStackLayout
+            {
+                Spacing = 4,
+                HorizontalOptions = LayoutOptions.Center,
+                VerticalOptions = LayoutOptions.Center
+            };
+
+            var emojiLabel = new Label
+            {
+                Text = isEarned ? achievement.Emoji : "?",
+                FontSize = 28,
+                HorizontalOptions = LayoutOptions.Center,
+                Opacity = isEarned ? 1.0 : 0.4
+            };
+
+            stack.Children.Add(emojiLabel);
+            container.Content = stack;
+
+            // Add tap gesture for showing achievement details
+            var tapGesture = new TapGestureRecognizer();
+            tapGesture.Tapped += async (s, e) => await ShowAchievementDetailsAsync(achievement);
+            container.GestureRecognizers.Add(tapGesture);
+
+            return container;
+        }
+
+        private async Task ShowAchievementDetailsAsync(Achievement achievement)
+        {
+            var status = achievement.IsEarned 
+                ? $"Получено: {achievement.EarnedAt?.ToString("dd MMM yyyy HH:mm")}"
+                : "Еще не получено";
+            
+            await DisplayAlert(
+                $"{achievement.Emoji} {achievement.Name}",
+                $"{achievement.Description}\n\n{status}",
+                "ОК");
         }
 
         private void UpdateFriendlinessDisplay(double friendliness, int messagesAnalyzed)
         {
-            // friendliness is from -1 (evil) to 1 (kind)
-            // Convert to 0-1 range for positioning
-            double normalizedValue = (friendliness + 1) / 2.0;
+            // friendliness is from 0 (evil) to 1 (kind)
+            // Clamp to valid range
+            double normalizedValue = Math.Clamp(friendliness, 0, 1);
             
             // Update the indicator position
-            // The progress bar width is approximately the parent width minus padding
-            // We'll use a percentage-based margin
             MainThread.BeginInvokeOnMainThread(() =>
             {
                 // Get the parent width (approximate)
@@ -78,26 +155,28 @@ namespace FinanceAssistant.Pages
 
         private static string GetFriendlinessText(double friendliness)
         {
+            // friendliness: 0.0 = very rude, 0.5 = neutral, 1.0 = very kind
             return friendliness switch
             {
-                < -0.7 => "Очень грубый",
-                < -0.4 => "Грубый",
-                < -0.1 => "Немного грубый",
-                < 0.1 => "Нейтрально",
-                < 0.4 => "Дружелюбный",
-                < 0.7 => "Очень дружелюбный",
+                < 0.2 => "Очень грубый",
+                < 0.35 => "Грубый",
+                < 0.45 => "Немного грубый",
+                < 0.55 => "Нейтрально",
+                < 0.65 => "Дружелюбный",
+                < 0.8 => "Очень дружелюбный",
                 _ => "Супер добрый!"
             };
         }
 
         private static Color GetFriendlinessColor(double friendliness)
         {
+            // friendliness: 0.0 = very rude, 0.5 = neutral, 1.0 = very kind
             return friendliness switch
             {
-                < -0.4 => Color.FromArgb("#FF6B6B"), // Red
-                < -0.1 => Color.FromArgb("#FFA07A"), // Light red
-                < 0.1 => Color.FromArgb("#FFE66D"),  // Yellow
-                < 0.4 => Color.FromArgb("#90EE90"),  // Light green
+                < 0.3 => Color.FromArgb("#FF6B6B"), // Red
+                < 0.45 => Color.FromArgb("#FFA07A"), // Light red
+                < 0.55 => Color.FromArgb("#FFE66D"),  // Yellow
+                < 0.7 => Color.FromArgb("#90EE90"),  // Light green
                 _ => Color.FromArgb("#00D09E")       // Green
             };
         }
@@ -131,46 +210,9 @@ namespace FinanceAssistant.Pages
             await Shell.Current.GoToAsync("..");
         }
 
-        private async void OnGenerateTestDataTapped(object? sender, EventArgs e)
+        private async void OnSettingsTapped(object? sender, EventArgs e)
         {
-            bool confirm = await DisplayAlert(
-                "Генерация тестовых данных",
-                "Будут добавлены случайные транзакции за последние 60 дней. Продолжить?",
-                "Да", "Отмена");
-            
-            if (!confirm) return;
-            
-            try
-            {
-                int count = await _databaseService.SeedTestDataAsync();
-                await DisplayAlert("Успех", $"Добавлено {count} тестовых транзакций!", "ОК");
-                await LoadProfileAsync();
-            }
-            catch (Exception ex)
-            {
-                await DisplayAlert("Ошибка", $"Не удалось сгенерировать данные: {ex.Message}", "ОК");
-            }
-        }
-
-        private async void OnClearDataTapped(object? sender, EventArgs e)
-        {
-            bool confirm = await DisplayAlert(
-                "Очистить все данные",
-                "Все транзакции будут удалены. Это действие нельзя отменить. Продолжить?",
-                "Удалить все", "Отмена");
-            
-            if (!confirm) return;
-            
-            try
-            {
-                await _databaseService.ClearAllTransactionsAsync();
-                await DisplayAlert("Успех", "Все транзакции удалены!", "ОК");
-                await LoadProfileAsync();
-            }
-            catch (Exception ex)
-            {
-                await DisplayAlert("Ошибка", $"Не удалось очистить данные: {ex.Message}", "ОК");
-            }
+            await Shell.Current.GoToAsync("SettingsPage");
         }
     }
 }

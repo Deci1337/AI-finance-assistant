@@ -1,20 +1,23 @@
 using FinanceAssistant.Data;
 using FinanceAssistant.Models;
+using FinanceAssistant.Services;
 
 namespace FinanceAssistant.Pages
 {
     public partial class AddTransactionPage : ContentPage
     {
         private readonly DatabaseService _databaseService;
+        private readonly AchievementService _achievementService;
         private TransactionType _currentType = TransactionType.Expense;
         private ImportanceLevel _currentImportance = ImportanceLevel.Medium;
         private Category? _selectedCategory;
         private List<Category> _categories = new();
 
-        public AddTransactionPage(DatabaseService databaseService)
+        public AddTransactionPage(DatabaseService databaseService, AchievementService achievementService)
         {
             InitializeComponent();
             _databaseService = databaseService;
+            _achievementService = achievementService;
         }
 
         protected override async void OnAppearing()
@@ -214,6 +217,10 @@ namespace FinanceAssistant.Pages
             };
 
             await _databaseService.SaveTransactionAsync(transaction);
+            
+            // Check for achievements
+            await _achievementService.CheckTransactionAchievementsAsync(transaction);
+            
             await Shell.Current.GoToAsync("..");
         }
 

@@ -2,14 +2,14 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="FinanceAssistant.Pages.StatisticsPage"
-             BackgroundColor="{StaticResource BackgroundDark}"
+             BackgroundColor="{DynamicResource BackgroundDark}"
              Shell.NavBarIsVisible="False">
 
     <Grid RowDefinitions="Auto,*">
         
         <!-- Header -->
         <Grid Grid.Row="0" Padding="20,50,20,20" ColumnDefinitions="Auto,*">
-            <Border BackgroundColor="{StaticResource BackgroundElevated}"
+            <Border BackgroundColor="{DynamicResource BackgroundElevated}"
                     StrokeShape="RoundRectangle 20"
                     Stroke="Transparent"
                     HeightRequest="40"
@@ -18,7 +18,7 @@
                     <TapGestureRecognizer Tapped="OnBackTapped"/>
                 </Border.GestureRecognizers>
                 <Label Text="&lt;"
-                       TextColor="{StaticResource TextPrimary}"
+                       TextColor="{DynamicResource TextPrimary}"
                        FontSize="20"
                        HorizontalOptions="Center"
                        VerticalOptions="Center"/>
@@ -26,7 +26,7 @@
             
             <Label Grid.Column="1"
                    Text="Статистика"
-                   TextColor="{StaticResource TextPrimary}"
+                   TextColor="{DynamicResource TextPrimary}"
                    FontSize="20"
                    FontAttributes="Bold"
                    HorizontalOptions="Center"
@@ -39,7 +39,7 @@
             <VerticalStackLayout Spacing="20" Padding="20,10">
                 
                 <!-- Period Selector -->
-                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                <Border BackgroundColor="{DynamicResource BackgroundCard}"
                         StrokeShape="RoundRectangle 15"
                         Stroke="Transparent"
                         Padding="5">
@@ -53,7 +53,7 @@
                                 <TapGestureRecognizer Tapped="OnPeriodTapped" CommandParameter="1"/>
                             </Border.GestureRecognizers>
                             <Label Text="1D"
-                                   TextColor="{StaticResource TextSecondary}"
+                                   TextColor="{DynamicResource TextSecondary}"
                                    FontSize="14"
                                    HorizontalOptions="Center"/>
                         </Border>
@@ -69,7 +69,7 @@
                             </Border.GestureRecognizers>
                             <Label x:Name="Period7DaysLabel"
                                    Text="7D"
-                                   TextColor="{StaticResource BackgroundDark}"
+                                   TextColor="{DynamicResource BackgroundDark}"
                                    FontSize="14"
                                    FontAttributes="Bold"
                                    HorizontalOptions="Center"/>
@@ -85,7 +85,7 @@
                                 <TapGestureRecognizer Tapped="OnPeriodTapped" CommandParameter="30"/>
                             </Border.GestureRecognizers>
                             <Label Text="30D"
-                                   TextColor="{StaticResource TextSecondary}"
+                                   TextColor="{DynamicResource TextSecondary}"
                                    FontSize="14"
                                    HorizontalOptions="Center"/>
                         </Border>
@@ -100,7 +100,7 @@
                                 <TapGestureRecognizer Tapped="OnPeriodTapped" CommandParameter="365"/>
                             </Border.GestureRecognizers>
                             <Label Text="1Y"
-                                   TextColor="{StaticResource TextSecondary}"
+                                   TextColor="{DynamicResource TextSecondary}"
                                    FontSize="14"
                                    HorizontalOptions="Center"/>
                         </Border>
@@ -109,13 +109,13 @@
 
                 <!-- Summary Cards -->
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="15">
-                    <Border BackgroundColor="{StaticResource BackgroundCard}"
+                    <Border BackgroundColor="{DynamicResource BackgroundCard}"
                             StrokeShape="RoundRectangle 20"
                             Stroke="Transparent"
                             Padding="15">
                         <VerticalStackLayout Spacing="5">
                             <Label Text="Доходы"
-                                   TextColor="{StaticResource TextSecondary}"
+                                   TextColor="{DynamicResource TextSecondary}"
                                    FontSize="12"/>
                             <Label x:Name="PeriodIncomeLabel"
                                    Text="0 RUB"
@@ -126,13 +126,13 @@
                     </Border>
                     
                     <Border Grid.Column="1"
-                            BackgroundColor="{StaticResource BackgroundCard}"
+                            BackgroundColor="{DynamicResource BackgroundCard}"
                             StrokeShape="RoundRectangle 20"
                             Stroke="Transparent"
                             Padding="15">
                         <VerticalStackLayout Spacing="5">
                             <Label Text="Расходы"
-                                   TextColor="{StaticResource TextSecondary}"
+                                   TextColor="{DynamicResource TextSecondary}"
                                    FontSize="12"/>
                             <Label x:Name="PeriodExpenseLabel"
                                    Text="0 RUB"
@@ -144,13 +144,13 @@
                 </Grid>
 
                 <!-- Bar Chart -->
-                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                <Border BackgroundColor="{DynamicResource BackgroundCard}"
                         StrokeShape="RoundRectangle 20"
                         Stroke="Transparent"
                         Padding="15">
                     <VerticalStackLayout Spacing="15">
                         <Label Text="Доходы и расходы"
-                               TextColor="{StaticResource TextPrimary}"
+                               TextColor="{DynamicResource TextPrimary}"
                                FontSize="18"
                                FontAttributes="Bold"/>
                         
@@ -162,7 +162,7 @@
                                          HeightRequest="12"
                                          CornerRadius="3"/>
                                 <Label Text="Доходы"
-                                       TextColor="{StaticResource TextSecondary}"
+                                       TextColor="{DynamicResource TextSecondary}"
                                        FontSize="12"/>
                             </HorizontalStackLayout>
                             <HorizontalStackLayout Spacing="8">
@@ -171,7 +171,7 @@
                                          HeightRequest="12"
                                          CornerRadius="3"/>
                                 <Label Text="Расходы"
-                                       TextColor="{StaticResource TextSecondary}"
+                                       TextColor="{DynamicResource TextSecondary}"
                                        FontSize="12"/>
                             </HorizontalStackLayout>
                         </HorizontalStackLayout>
@@ -183,35 +183,37 @@
                 </Border>
 
                 <!-- Radar Chart - Category Comparison -->
-                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                <Border BackgroundColor="{DynamicResource BackgroundCard}"
                         StrokeShape="RoundRectangle 20"
                         Stroke="Transparent"
                         Padding="15">
                     <VerticalStackLayout Spacing="15">
                         <Label Text="Сравнение категорий"
-                               TextColor="{StaticResource TextPrimary}"
+                               TextColor="{DynamicResource TextPrimary}"
                                FontSize="18"
                                FontAttributes="Bold"/>
                         
                         <GraphicsView x:Name="RadarChartView"
-                                      HeightRequest="280"
+                                      HeightRequest="350"
+                                      WidthRequest="350"
+                                      HorizontalOptions="Center"
                                       BackgroundColor="Transparent"/>
                         
                         <!-- Category Legend -->
-                        <VerticalStackLayout x:Name="CategoryLegend" Spacing="10">
+                        <VerticalStackLayout x:Name="CategoryLegend" Spacing="8">
                             <!-- Categories will be added dynamically -->
                         </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Border>
 
                 <!-- Top Expenses -->
-                <Border BackgroundColor="{StaticResource BackgroundCard}"
+                <Border BackgroundColor="{DynamicResource BackgroundCard}"
                         StrokeShape="RoundRectangle 20"
                         Stroke="Transparent"
                         Padding="15">
                     <VerticalStackLayout Spacing="15">
                         <Label Text="Топ расходов"
-                               TextColor="{StaticResource TextPrimary}"
+                               TextColor="{DynamicResource TextPrimary}"
                                FontSize="18"
                                FontAttributes="Bold"/>
                         

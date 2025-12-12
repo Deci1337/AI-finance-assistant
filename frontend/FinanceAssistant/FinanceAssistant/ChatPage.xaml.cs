@@ -4,6 +4,9 @@ using FinanceAssistant.Services;
 using Microsoft.Maui.Controls.Shapes;
 using System.Text.RegularExpressions;
 using Microsoft.Maui.Media;
+using Plugin.Maui.Audio;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace FinanceAssistant
 {
@@ -11,22 +14,146 @@ namespace FinanceAssistant
     {
         private readonly FinanceService _financeService;
         private readonly DatabaseService _databaseService;
+        private readonly AchievementService _achievementService;
+        private readonly IAudioManager _audioManager;
+        private IAudioRecorder? _audioRecorder;
         private bool _isRecording = false;
-        private string? _currentAudioPath = null;
+        private View? _recordingStatusMessage = null;
 
-        public ChatPage(FinanceService financeService, DatabaseService databaseService)
+        public ChatPage(FinanceService financeService, DatabaseService databaseService, AchievementService achievementService)
         {
             InitializeComponent();
             _financeService = financeService;
             _databaseService = databaseService;
+            _achievementService = achievementService;
+            _audioManager = AudioManager.Current;
+            
+            // Subscribe to achievement events
+            _achievementService.AchievementEarned += OnAchievementEarned;
             
             AddWelcomeMessage();
+            UpdateConnectionStatus($"Сервер: {_financeService.GetCurrentServerUrl()}", false);
         }
 
-        protected override void OnAppearing()
+        protected override async void OnAppearing()
         {
             base.OnAppearing();
+            await CheckAndConnectToServerAsync();
+            await LoadChatHistoryAsync();
             ScrollToBottom();
+        }
+
+        private async Task CheckAndConnectToServerAsync()
+        {
+            // Проверяем текущее подключение
+            var isHealthy = await _financeService.CheckHealthAsync();
+            
+            if (!isHealthy)
+            {
+                UpdateConnectionStatus("Поиск сервера...", false);
+                
+                // Пробуем найти работающий сервер
+                var (found, url) = await _financeService.FindWorkingServerAsync();
+                
+                if (found)
+                {
+                    UpdateConnectionStatus($"Сервер: {url}", true);
+                }
+                else
+                {
+                    UpdateConnectionStatus("Сервер не найден", false);
+                }
+            }
+            else
+            {
+                UpdateConnectionStatus($"Сервер: {_financeService.GetCurrentServerUrl()}", true);
+            }
+        }
+
+        private void UpdateConnectionStatus(string status, bool isConnected)
+        {
+            ConnectionStatusLabel.Text = status;
+            ConnectionIndicator.Text = isConnected ? "●" : "○";
+            ConnectionIndicator.TextColor = isConnected ? Color.FromArgb("#00D09E") : Color.FromArgb("#FF6B6B");
+        }
+
+        private async Task LoadChatHistoryAsync()
+        {
+            try
+            {
+                var history = await _databaseService.GetChatHistoryAsync(20);
+                if (history != null && history.Count > 0)
+                {
+                    // Clear existing messages except welcome message
+                    var welcomeMessage = MessagesContainer.Children.FirstOrDefault();
+                    MessagesContainer.Children.Clear();
+                    if (welcomeMessage != null)
+                        MessagesContainer.Children.Add(welcomeMessage);
+                    
+                    // Load history in chronological order
+                    var sortedHistory = history.OrderBy(m => m.Timestamp).ToList();
+                    foreach (var msg in sortedHistory)
+                    {
+                        if (msg.IsUser)
+                            AddUserMessage(msg.Message);
+                        else
+                            MessagesContainer.Children.Add(CreateBotMessageView(msg.Message));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading chat history: {ex.Message}");
+            }
+        }
+
+        private async Task<string> BuildContextAsync()
+        {
+            try
+            {
+                var transactions = await _databaseService.GetTransactionsAsync();
+                if (transactions == null || transactions.Count == 0)
+                    return string.Empty;
+
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("История транзакций пользователя:");
+                
+                // Group by month
+                var groupedByMonth = transactions
+                    .OrderByDescending(t => t.Date)
+                    .GroupBy(t => new { t.Date.Year, t.Date.Month })
+                    .Take(3); // Last 3 months
+
+                foreach (var monthGroup in groupedByMonth)
+                {
+                    var monthName = new DateTime(monthGroup.Key.Year, monthGroup.Key.Month, 1).ToString("MMMM yyyy");
+                    sb.AppendLine($"\n{monthName}:");
+                    
+                    var expenses = monthGroup.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount);
+                    var income = monthGroup.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount);
+                    
+                    sb.AppendLine($"  Доходы: {income:N0} руб.");
+                    sb.AppendLine($"  Расходы: {expenses:N0} руб.");
+                    
+                    // Group by category
+                    var byCategory = monthGroup
+                        .Where(t => t.Type == TransactionType.Expense)
+                        .GroupBy(t => t.Category?.Name ?? "Другое")
+                        .OrderByDescending(g => g.Sum(t => t.Amount));
+                    
+                    foreach (var cat in byCategory)
+                    {
+                        sb.AppendLine($"    {cat.Key}: {cat.Sum(t => t.Amount):N0} руб.");
+                    }
+                }
+                
+                return sb.ToString();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error building context: {ex.Message}");
+                return string.Empty;
+            }
         }
 
         private async void OnBackTapped(object? sender, EventArgs e)
@@ -51,6 +178,7 @@ namespace FinanceAssistant
                 "Отмена", 
                 null, 
                 "Ввести IP адрес", 
+                "Поиск сервера",
                 "Использовать localhost (Windows)",
                 "Использовать 10.0.2.2 (Android эмулятор)",
                 "Как узнать IP компьютера?"
@@ -74,19 +202,26 @@ namespace FinanceAssistant
                     if (!ip.Contains(":8000"))
                         ip = $"{ip}:8000";
                     
-                    Preferences.Set("api_base_url", ip);
-                    await DisplayAlert("Готово", $"Адрес сервера: {ip}\n\nПерезапустите чат для применения.", "OK");
+                    _financeService.SetServerUrl(ip);
+                    await DisplayAlert("Готово", $"Адрес сервера: {ip}", "OK");
+                    await CheckAndConnectToServerAsync();
                 }
             }
             else if (action == "Использовать localhost (Windows)")
             {
-                Preferences.Set("api_base_url", "http://localhost:8000");
+                _financeService.SetServerUrl("http://localhost:8000");
                 await DisplayAlert("Готово", "Установлен localhost:8000", "OK");
+                await CheckAndConnectToServerAsync();
             }
             else if (action == "Использовать 10.0.2.2 (Android эмулятор)")
             {
-                Preferences.Set("api_base_url", "http://10.0.2.2:8000");
+                _financeService.SetServerUrl("http://10.0.2.2:8000");
                 await DisplayAlert("Готово", "Установлен 10.0.2.2:8000", "OK");
+                await CheckAndConnectToServerAsync();
+            }
+            else if (action == "Поиск сервера")
+            {
+                await CheckAndConnectToServerAsync();
             }
             else if (action == "Как узнать IP компьютера?")
             {
@@ -125,15 +260,32 @@ namespace FinanceAssistant
         {
             var messageLower = message.ToLower();
             
+            // Question patterns - should NOT be treated as transaction input
+            var questionPatterns = new[]
+            {
+                "сколько я потратил", "сколько я потратила", "сколько потратил", "сколько потратила",
+                "сколько я заработал", "сколько я заработала", "сколько заработал", "сколько заработала",
+                "сколько я получил", "сколько я получила", "сколько получил", "сколько получила",
+                "покажи расходы", "покажи траты", "покажи доходы",
+                "мои расходы", "мои траты", "мои доходы",
+                "за месяц", "за неделю", "за день", "за год",
+                "за октябрь", "за ноябрь", "за декабрь", "за январь", "за февраль", "за март",
+                "за апрель", "за май", "за июнь", "за июль", "за август", "за сентябрь",
+                "какие расходы", "какие траты", "какие доходы",
+                "статистика", "анализ расходов", "анализ трат"
+            };
+            
+            // If message is a question about spending, don't treat as transaction
+            if (questionPatterns.Any(p => messageLower.Contains(p)))
+                return false;
+            
             var transactionKeywords = new[]
             {
                 "потратил", "потратила", "потратили",
                 "купил", "купила", "купили", "купить",
                 "заплатил", "заплатила", "заплатили",
-                "трата", "траты", "расход", "расходы",
                 "получил", "получила", "получили",
                 "заработал", "заработала", "заработали",
-                "доход", "зарплата", "зарплату", "прибыль",
                 "добавь", "добавить", "запиши", "записать", "внеси"
             };
             
@@ -150,7 +302,8 @@ namespace FinanceAssistant
             bool hasAmount = amountPatterns.Any(p => 
                 Regex.IsMatch(messageLower, p, RegexOptions.IgnoreCase));
             
-            return hasTransactionKeyword || hasAmount;
+            // Transaction needs BOTH a keyword AND an amount (to distinguish from questions)
+            return hasTransactionKeyword && hasAmount;
         }
 
         private bool IsForecastMessage(string message)
@@ -182,8 +335,14 @@ namespace FinanceAssistant
             AddUserMessage(message);
             ScrollToBottom();
 
+            // Save user message to history
+            await _databaseService.SaveChatMessageAsync(message, isUser: true);
+
             // Analyze friendliness in background
             _ = AnalyzeFriendlinessAsync(message);
+            
+            // Check for first AI message achievement
+            _ = _achievementService.CheckFirstAiMessageAsync();
 
             var loadingView = CreateLoadingMessageView();
             MessagesContainer.Children.Add(loadingView);
@@ -222,32 +381,42 @@ namespace FinanceAssistant
                     }
                     else
                     {
-                        var noTransactionsView = CreateBotMessageView(
-                            result.Analysis ?? "Не удалось извлечь транзакции.\n\n" +
+                        var errorText = result.Analysis ?? "Не удалось извлечь транзакции.\n\n" +
                             "Попробуйте указать сумму явно, например:\n" +
-                            "'Потратил 500 рублей на еду'"
-                        );
+                            "'Потратил 500 рублей на еду'";
+                        var noTransactionsView = CreateBotMessageView(errorText);
                         MessagesContainer.Children.Add(noTransactionsView);
                         ScrollToBottom();
+                        
+                        // Save bot response to history
+                        await _databaseService.SaveChatMessageAsync(errorText, isUser: false);
                     }
                 }
                 else
                 {
-                    // Handle as general chat
-                    var chatResult = await _financeService.SendChatMessageAsync(message);
+                    // Handle as general chat - prepare context with transactions
+                    var context = await BuildContextAsync();
+                    var chatResult = await _financeService.SendChatMessageAsync(message, context);
                     MessagesContainer.Children.Remove(loadingView);
 
                     var botResponse = CreateBotMessageView(chatResult.Response);
                     MessagesContainer.Children.Add(botResponse);
                     ScrollToBottom();
+                    
+                    // Save bot response to history
+                    await _databaseService.SaveChatMessageAsync(chatResult.Response, isUser: false);
                 }
             }
             catch (Exception ex)
             {
                 MessagesContainer.Children.Remove(loadingView);
-                var errorView = CreateBotMessageView($"Произошла ошибка: {ex.Message}");
+                var errorText = $"Произошла ошибка: {ex.Message}";
+                var errorView = CreateBotMessageView(errorText);
                 MessagesContainer.Children.Add(errorView);
                 ScrollToBottom();
+                
+                // Save error message to history
+                await _databaseService.SaveChatMessageAsync(errorText, isUser: false);
             }
 
             MessageEntry.IsEnabled = true;
@@ -277,6 +446,112 @@ namespace FinanceAssistant
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error analyzing friendliness: {ex.Message}");
+            }
+        }
+
+        private void OnAchievementEarned(Achievement achievement)
+        {
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                await ShowAchievementNotificationAsync(achievement);
+            });
+        }
+
+        private async Task ShowAchievementNotificationAsync(Achievement achievement)
+        {
+            // Create notification popup
+            var notification = new Border
+            {
+                BackgroundColor = Color.FromArgb("#1F2937"),
+                StrokeShape = new RoundRectangle { CornerRadius = 20 },
+                Stroke = Color.FromArgb("#00D09E"),
+                StrokeThickness = 2,
+                Padding = new Thickness(20, 15),
+                HorizontalOptions = LayoutOptions.Center,
+                VerticalOptions = LayoutOptions.End,
+                Margin = new Thickness(20, 0, 20, 100),
+                TranslationY = 200,
+                Opacity = 0
+            };
+
+            var shadow = new Shadow
+            {
+                Brush = Color.FromArgb("#00D09E"),
+                Offset = new Point(0, 0),
+                Radius = 15,
+                Opacity = 0.5f
+            };
+            notification.Shadow = shadow;
+
+            var content = new HorizontalStackLayout
+            {
+                Spacing = 15,
+                HorizontalOptions = LayoutOptions.Center
+            };
+
+            var emoji = new Label
+            {
+                Text = achievement.Emoji,
+                FontSize = 32,
+                VerticalOptions = LayoutOptions.Center
+            };
+
+            var textStack = new VerticalStackLayout
+            {
+                Spacing = 2,
+                VerticalOptions = LayoutOptions.Center
+            };
+
+            var title = new Label
+            {
+                Text = "Достижение получено!",
+                FontSize = 12,
+                TextColor = Color.FromArgb("#00D09E"),
+                FontAttributes = FontAttributes.Bold
+            };
+
+            var name = new Label
+            {
+                Text = achievement.Name,
+                FontSize = 16,
+                TextColor = Colors.White,
+                FontAttributes = FontAttributes.Bold
+            };
+
+            textStack.Children.Add(title);
+            textStack.Children.Add(name);
+            
+            content.Children.Add(emoji);
+            content.Children.Add(textStack);
+            
+            notification.Content = content;
+
+            // Add to page
+            if (Content is Grid grid)
+            {
+                grid.Children.Add(notification);
+                Grid.SetRowSpan(notification, 99);
+            }
+
+            // Animate in
+            await Task.WhenAll(
+                notification.TranslateTo(0, 0, 300, Easing.CubicOut),
+                notification.FadeTo(1, 300)
+            );
+
+            // Wait
+            await Task.Delay(3000);
+
+            // Animate out
+            await Task.WhenAll(
+                notification.TranslateTo(0, 200, 300, Easing.CubicIn),
+                notification.FadeTo(0, 300)
+            );
+
+            // Remove
+            if (Content is Grid g)
+            {
+                g.Children.Remove(notification);
             }
         }
 
@@ -311,13 +586,42 @@ namespace FinanceAssistant
 
         private View CreateBotMessageView(string message)
         {
+            var container = new HorizontalStackLayout
+            {
+                Spacing = 10,
+                HorizontalOptions = LayoutOptions.Start,
+                VerticalOptions = LayoutOptions.Start
+            };
+
+            // Avatar
+            var avatarBorder = new Border
+            {
+                BackgroundColor = Colors.Transparent,
+                StrokeShape = new RoundRectangle { CornerRadius = 20 },
+                Stroke = Brush.Transparent,
+                WidthRequest = 40,
+                HeightRequest = 40,
+                VerticalOptions = LayoutOptions.Start
+            };
+
+            var avatarImage = new Image
+            {
+                Source = "ai_avatar.jpg",
+                Aspect = Aspect.AspectFill,
+                WidthRequest = 40,
+                HeightRequest = 40
+            };
+
+            avatarBorder.Content = avatarImage;
+            container.Children.Add(avatarBorder);
+
+            // Message bubble
             var border = new Border
             {
                 BackgroundColor = Color.FromArgb("#161B22"),
                 StrokeShape = new RoundRectangle { CornerRadius = 15 },
                 Stroke = Brush.Transparent,
                 Padding = new Thickness(15),
-                HorizontalOptions = LayoutOptions.Start,
                 MaximumWidthRequest = 300
             };
 
@@ -329,11 +633,43 @@ namespace FinanceAssistant
             };
 
             border.Content = label;
-            return border;
+            container.Children.Add(border);
+
+            return container;
         }
 
         private View CreateLoadingMessageView()
         {
+            var container = new HorizontalStackLayout
+            {
+                Spacing = 10,
+                HorizontalOptions = LayoutOptions.Start,
+                VerticalOptions = LayoutOptions.Start
+            };
+
+            // Avatar
+            var avatarBorder = new Border
+            {
+                BackgroundColor = Colors.Transparent,
+                StrokeShape = new RoundRectangle { CornerRadius = 20 },
+                Stroke = Brush.Transparent,
+                WidthRequest = 40,
+                HeightRequest = 40,
+                VerticalOptions = LayoutOptions.Start
+            };
+
+            var avatarImage = new Image
+            {
+                Source = "ai_avatar.jpg",
+                Aspect = Aspect.AspectFill,
+                WidthRequest = 40,
+                HeightRequest = 40
+            };
+
+            avatarBorder.Content = avatarImage;
+            container.Children.Add(avatarBorder);
+
+            // Loading bubble
             var border = new Border
             {
                 BackgroundColor = Color.FromArgb("#161B22"),
@@ -350,7 +686,9 @@ namespace FinanceAssistant
             };
 
             border.Content = activityIndicator;
-            return border;
+            container.Children.Add(border);
+
+            return container;
         }
 
         private View CreateTransactionPreviewView(FinanceAssistant.Services.ExtractedTransaction extractedTransaction, FinanceAssistant.Services.TransactionExtractionResult result)
@@ -465,6 +803,9 @@ namespace FinanceAssistant
             };
 
             await _databaseService.SaveTransactionAsync(transaction);
+            
+            // Check for achievements
+            await _achievementService.CheckTransactionAchievementsAsync(transaction);
 
             var successView = CreateBotMessageView($"Транзакция '{transaction.Title}' успешно добавлена!");
             MessagesContainer.Children.Add(successView);
@@ -545,14 +886,6 @@ namespace FinanceAssistant
 
         private async void OnMicrophoneTapped(object? sender, EventArgs e)
         {
-            if (_isRecording)
-            {
-                // Второе нажатие - пытаемся остановить запись
-                // MediaPicker управляет записью через системный диалог,
-                // поэтому просто показываем подсказку
-                return;
-            }
-
             try
             {
                 var status = await Permissions.RequestAsync<Permissions.Microphone>();
@@ -562,17 +895,42 @@ namespace FinanceAssistant
                     return;
                 }
 
-                _isRecording = true;
-                MicrophoneIcon.Text = "⏹";
-                // TODO: Audio recording requires platform-specific implementation
-                // CaptureAudioAsync is not available in MAUI's MediaPicker
-                var notImplementedMessage = CreateBotMessageView("Голосовой ввод пока недоступен. Введите текст вручную.");
-                MessagesContainer.Children.Add(notImplementedMessage);
-                ScrollToBottom();
-                
-                _isRecording = false;
-                MicrophoneIcon.Text = "🎤";
-                MicrophoneButton.BackgroundColor = Color.FromArgb("#21262D");
+                if (!_isRecording)
+                {
+                    // Start recording
+                    _audioRecorder = _audioManager.CreateRecorder();
+                    await _audioRecorder.StartAsync();
+                    
+                    _isRecording = true;
+                    MicrophoneIcon.Text = "⏹";
+                    MicrophoneButton.BackgroundColor = Color.FromArgb("#FF6B6B");
+                    
+                    _recordingStatusMessage = CreateBotMessageView("🎤 Запись... Нажмите еще раз для остановки.");
+                    MessagesContainer.Children.Add(_recordingStatusMessage);
+                    ScrollToBottom();
+                }
+                else
+                {
+                    // Stop recording
+                    if (_audioRecorder != null)
+                    {
+                        var recording = await _audioRecorder.StopAsync();
+                        
+                        _isRecording = false;
+                        MicrophoneIcon.Text = "🎤";
+                        MicrophoneButton.BackgroundColor = Color.FromArgb("#21262D");
+                        
+                        // Remove status message
+                        if (_recordingStatusMessage != null)
+                        {
+                            MessagesContainer.Children.Remove(_recordingStatusMessage);
+                            _recordingStatusMessage = null;
+                        }
+                        
+                        // Process the recording
+                        await ProcessAudioStreamAsync(recording);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -581,6 +939,52 @@ namespace FinanceAssistant
                 MicrophoneButton.BackgroundColor = Color.FromArgb("#21262D");
                 
                 var errorMessage = CreateBotMessageView($"❌ Ошибка записи: {ex.Message}");
+                MessagesContainer.Children.Add(errorMessage);
+                ScrollToBottom();
+            }
+        }
+
+        private async Task ProcessAudioStreamAsync(IAudioSource audioSource)
+        {
+            try
+            {
+                var statusMessage = CreateBotMessageView("🔄 Обработка аудио...");
+                MessagesContainer.Children.Add(statusMessage);
+                ScrollToBottom();
+
+                // Get the audio stream
+                var audioStream = audioSource.GetAudioStream();
+                var transcriptionResult = await _financeService.TranscribeAudioAsync(audioStream, "recording.wav");
+
+                // Remove status message
+                MessagesContainer.Children.Remove(statusMessage);
+
+                if (!string.IsNullOrEmpty(transcriptionResult.Error))
+                {
+                    var errorMessage = CreateBotMessageView($"❌ Ошибка: {transcriptionResult.Error}");
+                    MessagesContainer.Children.Add(errorMessage);
+                    ScrollToBottom();
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(transcriptionResult.Text))
+                {
+                    var errorMessage = CreateBotMessageView("❌ Не удалось распознать речь. Попробуйте еще раз.");
+                    MessagesContainer.Children.Add(errorMessage);
+                    ScrollToBottom();
+                    return;
+                }
+
+                // Show transcribed text as user message
+                AddUserMessage(transcriptionResult.Text);
+                ScrollToBottom();
+
+                // Process the transcribed text
+                await ProcessMessageAsync(transcriptionResult.Text);
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = CreateBotMessageView($"❌ Ошибка обработки аудио: {ex.Message}");
                 MessagesContainer.Children.Add(errorMessage);
                 ScrollToBottom();
             }
@@ -750,8 +1154,9 @@ namespace FinanceAssistant
                 }
                 else
                 {
-                    // Handle as general chat
-                    var chatResult = await _financeService.SendChatMessageAsync(message);
+                    // Handle as general chat - prepare context with transactions
+                    var context = await BuildContextAsync();
+                    var chatResult = await _financeService.SendChatMessageAsync(message, context);
                     MessagesContainer.Children.Remove(loadingView);
 
                     var botResponse = CreateBotMessageView(chatResult.Response);
