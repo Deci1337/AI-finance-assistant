@@ -11,9 +11,9 @@ router = APIRouter()
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_ai(request: ChatRequest) -> ChatResponse:
     """
-    Chat with AI assistant (Gemini)
+    Chat with AI assistant (GigaChat)
     
-    Sends user message to Gemini and returns response.
+    Sends user message to GigaChat and returns response.
     Context can include user's financial information.
     """
     try:
