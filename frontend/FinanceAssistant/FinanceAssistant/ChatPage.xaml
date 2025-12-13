@@ -8,7 +8,7 @@
     <Grid RowDefinitions="Auto,Auto,*,Auto">
         
         <!-- Header with back button and settings -->
-        <Grid Grid.Row="0" Padding="20,50,20,10" ColumnDefinitions="Auto,*,Auto">
+        <Grid Grid.Row="0" Padding="20,20,20,10" ColumnDefinitions="Auto,*,Auto">
             <Border BackgroundColor="{DynamicResource BackgroundElevated}"
                     StrokeShape="RoundRectangle 20"
                     Stroke="Transparent"
@@ -75,10 +75,11 @@
         </Border>
 
         <!-- Messages -->
-        <ScrollView x:Name="MessagesScrollView" Grid.Row="2" Margin="0,10,0,0">
+        <ScrollView x:Name="MessagesScrollView" Grid.Row="2" Margin="0,10,0,0" BackgroundColor="{DynamicResource BackgroundDark}">
             <VerticalStackLayout x:Name="MessagesContainer" 
                                  Spacing="15" 
-                                 Padding="20">
+                                 Padding="20"
+                                 BackgroundColor="{DynamicResource BackgroundDark}">
                 <!-- Messages will be added dynamically -->
             </VerticalStackLayout>
         </ScrollView>

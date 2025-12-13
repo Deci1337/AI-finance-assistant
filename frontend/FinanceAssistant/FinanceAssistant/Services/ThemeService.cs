@@ -32,10 +32,11 @@ namespace FinanceAssistant.Services
             var app = Application.Current;
             if (app == null) return;
             
+            app.UserAppTheme = isDark ? AppTheme.Dark : AppTheme.Light;
+            
             var mergedDictionaries = app.Resources.MergedDictionaries;
             if (mergedDictionaries == null) return;
 
-            // Update colors based on theme
             if (isDark)
             {
                 app.Resources["BackgroundDark"] = Color.FromArgb("#0D1117");

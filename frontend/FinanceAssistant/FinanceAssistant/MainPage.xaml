@@ -5,10 +5,10 @@
              BackgroundColor="{DynamicResource BackgroundDark}"
              NavigationPage.HasNavigationBar="False">
 
-    <Grid RowDefinitions="Auto,*,Auto">
+    <Grid RowDefinitions="Auto,*,Auto" BackgroundColor="{DynamicResource BackgroundDark}">
         
         <!-- Header with Profile -->
-        <Grid Grid.Row="0" Padding="20,50,20,20" ColumnDefinitions="*,Auto">
+        <Grid Grid.Row="0" Padding="20,20,20,20" ColumnDefinitions="*,Auto">
             <VerticalStackLayout Spacing="4">
                 <Label Text="С возвращением,"
                        TextColor="{DynamicResource TextSecondary}"
@@ -41,8 +41,8 @@
         </Grid>
 
         <!-- Main Content -->
-        <ScrollView Grid.Row="1">
-            <VerticalStackLayout Spacing="20" Padding="20,0">
+        <ScrollView Grid.Row="1" BackgroundColor="{DynamicResource BackgroundDark}">
+            <VerticalStackLayout Spacing="20" Padding="20,0" BackgroundColor="{DynamicResource BackgroundDark}">
                 
                 <!-- Balance Card -->
                 <Border BackgroundColor="{DynamicResource BackgroundCard}"
@@ -215,9 +215,6 @@
                         <!-- Transactions will be added dynamically -->
                     </VerticalStackLayout>
                 </VerticalStackLayout>
-                
-                <!-- Bottom spacing for FAB -->
-                <BoxView HeightRequest="80" Color="Transparent"/>
             </VerticalStackLayout>
         </ScrollView>
 

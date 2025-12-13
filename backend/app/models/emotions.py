@@ -19,3 +19,4 @@ class EmotionsAnalysisResponse(BaseModel):
     questions: Optional[List[str]] = None
     recommendations: Optional[str] = None
 
+

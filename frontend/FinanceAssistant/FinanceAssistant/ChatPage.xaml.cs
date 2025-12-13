@@ -156,6 +156,27 @@ namespace FinanceAssistant
             }
         }
 
+        private async Task<List<Dictionary<string, object>>> BuildTransactionsDataAsync(int maxDays = 365)
+        {
+            var all = await _databaseService.GetTransactionsAsync();
+            var minDate = DateTime.Now.Date.AddDays(-maxDays);
+
+            return all
+                .Where(t => t.Date.Date >= minDate)
+                .OrderByDescending(t => t.Date)
+                .Take(1000)
+                .Select(t => new Dictionary<string, object>
+                {
+                    { "title", t.Title },
+                    { "amount", (double)t.Amount },
+                    { "category", t.Category?.Name ?? "Other" },
+                    { "date", t.Date.ToString("yyyy-MM-dd") },
+                    { "importance", t.Importance.ToString().ToLower() },
+                    { "type", t.Type == TransactionType.Expense ? "expense" : "income" }
+                })
+                .ToList();
+        }
+
         private async void OnBackTapped(object? sender, EventArgs e)
         {
             await Shell.Current.GoToAsync("..");
@@ -396,7 +417,8 @@ namespace FinanceAssistant
                 {
                     // Handle as general chat - prepare context with transactions
                     var context = await BuildContextAsync();
-                    var chatResult = await _financeService.SendChatMessageAsync(message, context);
+                    var txData = await BuildTransactionsDataAsync();
+                    var chatResult = await _financeService.SendChatMessageAsync(message, context, txData);
                     MessagesContainer.Children.Remove(loadingView);
 
                     var botResponse = CreateBotMessageView(chatResult.Response);
@@ -459,10 +481,15 @@ namespace FinanceAssistant
 
         private async Task ShowAchievementNotificationAsync(Achievement achievement)
         {
+            var isDarkTheme = Application.Current?.RequestedTheme == AppTheme.Dark;
+            var backgroundColor = isDarkTheme ? Color.FromArgb("#1F2937") : Color.FromArgb("#FFFFFF");
+            var textColor = isDarkTheme ? Colors.White : Color.FromArgb("#1A1A2E");
+            var secondaryTextColor = isDarkTheme ? Color.FromArgb("#9CA3AF") : Color.FromArgb("#6C757D");
+            
             // Create notification popup
             var notification = new Border
             {
-                BackgroundColor = Color.FromArgb("#1F2937"),
+                BackgroundColor = backgroundColor,
                 StrokeShape = new RoundRectangle { CornerRadius = 20 },
                 Stroke = Color.FromArgb("#00D09E"),
                 StrokeThickness = 2,
@@ -471,15 +498,16 @@ namespace FinanceAssistant
                 VerticalOptions = LayoutOptions.End,
                 Margin = new Thickness(20, 0, 20, 100),
                 TranslationY = 200,
-                Opacity = 0
+                Opacity = 0,
+                ZIndex = 999
             };
 
             var shadow = new Shadow
             {
                 Brush = Color.FromArgb("#00D09E"),
-                Offset = new Point(0, 0),
+                Offset = new Point(0, 4),
                 Radius = 15,
-                Opacity = 0.5f
+                Opacity = 0.4f
             };
             notification.Shadow = shadow;
 
@@ -514,12 +542,20 @@ namespace FinanceAssistant
             {
                 Text = achievement.Name,
                 FontSize = 16,
-                TextColor = Colors.White,
+                TextColor = textColor,
                 FontAttributes = FontAttributes.Bold
             };
-
+            
+            var description = new Label
+            {
+                Text = achievement.Description,
+                FontSize = 12,
+                TextColor = secondaryTextColor
+            };
+            
             textStack.Children.Add(title);
             textStack.Children.Add(name);
+            textStack.Children.Add(description);
             
             content.Children.Add(emoji);
             content.Children.Add(textStack);
@@ -1160,7 +1196,8 @@ namespace FinanceAssistant
                 {
                     // Handle as general chat - prepare context with transactions
                     var context = await BuildContextAsync();
-                    var chatResult = await _financeService.SendChatMessageAsync(message, context);
+                    var txData = await BuildTransactionsDataAsync();
+                    var chatResult = await _financeService.SendChatMessageAsync(message, context, txData);
                     MessagesContainer.Children.Remove(loadingView);
 
                     var botResponse = CreateBotMessageView(chatResult.Response);

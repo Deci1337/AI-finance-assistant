@@ -8,7 +8,7 @@
     <Grid RowDefinitions="Auto,*">
         
         <!-- Header -->
-        <Grid Grid.Row="0" Padding="20,50,20,20" ColumnDefinitions="Auto,*">
+        <Grid Grid.Row="0" Padding="20,20,20,20" ColumnDefinitions="Auto,*">
             <Border BackgroundColor="{DynamicResource BackgroundElevated}"
                     StrokeShape="RoundRectangle 20"
                     Stroke="Transparent"
@@ -35,8 +35,8 @@
         </Grid>
 
         <!-- Content -->
-        <ScrollView Grid.Row="1">
-            <VerticalStackLayout Spacing="20" Padding="20,10">
+        <ScrollView Grid.Row="1" BackgroundColor="{DynamicResource BackgroundDark}">
+            <VerticalStackLayout Spacing="20" Padding="20,10" BackgroundColor="{DynamicResource BackgroundDark}">
                 
                 <!-- Appearance Section -->
                 <Border BackgroundColor="{DynamicResource BackgroundCard}"
@@ -50,37 +50,32 @@
                                FontAttributes="Bold"/>
                         
                         <!-- Theme Toggle -->
-                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="15">
-                            <Border BackgroundColor="{DynamicResource BackgroundElevated}"
-                                    StrokeShape="RoundRectangle 12"
-                                    Stroke="Transparent"
-                                    HeightRequest="44"
-                                    WidthRequest="44">
-                                <Label x:Name="ThemeIcon"
-                                       Text="M"
-                                       TextColor="{StaticResource Primary}"
-                                       FontSize="20"
-                                       HorizontalOptions="Center"
-                                       VerticalOptions="Center"/>
-                            </Border>
-                            
-                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
-                                <Label Text="Тема оформления"
-                                       TextColor="{DynamicResource TextPrimary}"
-                                       FontSize="16"/>
-                                <Label x:Name="ThemeStatusLabel"
-                                       Text="Темная тема"
-                                       TextColor="{DynamicResource TextSecondary}"
-                                       FontSize="12"/>
-                            </VerticalStackLayout>
-                            
-                            <Switch x:Name="ThemeSwitch"
-                                    Grid.Column="2"
-                                    IsToggled="True"
-                                    OnColor="{StaticResource Primary}"
-                                    ThumbColor="White"
-                                    Toggled="OnThemeToggled"
-                                    VerticalOptions="Center"/>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <VerticalStackLayout VerticalOptions="Center">
+                                    <Label Text="Тема оформления"
+                                           TextColor="{DynamicResource TextPrimary}"
+                                           FontSize="16"/>
+                                    <Label x:Name="ThemeStatusLabel"
+                                           Text="Темная тема"
+                                           TextColor="{DynamicResource TextSecondary}"
+                                           FontSize="12"/>
+                                </VerticalStackLayout>
+                                
+                                <Border Grid.Column="1"
+                                        BackgroundColor="{DynamicResource BackgroundElevated}"
+                                        StrokeShape="RoundRectangle 20"
+                                        Stroke="Transparent"
+                                        Padding="12,8"
+                                        VerticalOptions="Center">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnThemeTapped"/>
+                                    </Border.GestureRecognizers>
+                                    <Label x:Name="ThemeEmojiButton"
+                                           Text="🌙"
+                                           FontSize="20"
+                                           HorizontalOptions="Center"
+                                           VerticalOptions="Center"/>
+                                </Border>
                         </Grid>
                     </VerticalStackLayout>
                 </Border>
@@ -209,10 +204,9 @@
                                FontSize="12"/>
                     </VerticalStackLayout>
                 </Border>
-
-                <BoxView HeightRequest="30" Color="Transparent"/>
             </VerticalStackLayout>
         </ScrollView>
     </Grid>
 </ContentPage>
+
 

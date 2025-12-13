@@ -8,7 +8,7 @@
     <Grid RowDefinitions="Auto,*">
         
         <!-- Header -->
-        <Grid Grid.Row="0" Padding="20,50,20,20" ColumnDefinitions="Auto,*">
+        <Grid Grid.Row="0" Padding="20,20,20,20" ColumnDefinitions="Auto,*">
             <Border BackgroundColor="{DynamicResource BackgroundElevated}"
                     StrokeShape="RoundRectangle 20"
                     Stroke="Transparent"
@@ -35,8 +35,8 @@
         </Grid>
 
         <!-- Content -->
-        <ScrollView Grid.Row="1">
-            <VerticalStackLayout Spacing="20" Padding="20,10">
+        <ScrollView Grid.Row="1" BackgroundColor="{DynamicResource BackgroundDark}">
+            <VerticalStackLayout Spacing="20" Padding="20,10" BackgroundColor="{DynamicResource BackgroundDark}">
                 
                 <!-- Period Selector -->
                 <Border BackgroundColor="{DynamicResource BackgroundCard}"
@@ -222,8 +222,6 @@
                         </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Border>
-
-                <BoxView HeightRequest="30" Color="Transparent"/>
             </VerticalStackLayout>
         </ScrollView>
     </Grid>

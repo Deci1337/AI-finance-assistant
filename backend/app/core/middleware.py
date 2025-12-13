@@ -24,3 +24,4 @@ def setup_cors(app: FastAPI) -> None:
         max_age=3600,
     )
 
+

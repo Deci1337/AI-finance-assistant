@@ -1,12 +1,13 @@
 """Chat models"""
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict
 
 
 class ChatRequest(BaseModel):
     """Request model for AI chat"""
     message: str
     context: Optional[str] = None
+    transactions: Optional[List[Dict]] = None
 
 
 class ChatResponse(BaseModel):
@@ -25,4 +26,5 @@ class FriendlinessResponse(BaseModel):
     friendliness_score: float
     sentiment: str
     timestamp: str
+
 

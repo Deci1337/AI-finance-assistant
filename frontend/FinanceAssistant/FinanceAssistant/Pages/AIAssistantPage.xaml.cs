@@ -265,9 +265,22 @@ namespace FinanceAssistant.Pages
             {
                 // Получаем контекст финансов пользователя
                 var context = await GetFinancialContextAsync();
+                var txData = (await _databaseService.GetTransactionsAsync())
+                    .OrderByDescending(t => t.Date)
+                    .Take(1000)
+                    .Select(t => new Dictionary<string, object>
+                    {
+                        { "title", t.Title },
+                        { "amount", (double)t.Amount },
+                        { "category", t.Category?.Name ?? "Other" },
+                        { "date", t.Date.ToString("yyyy-MM-dd") },
+                        { "importance", t.Importance.ToString().ToLower() },
+                        { "type", t.Type == Models.TransactionType.Expense ? "expense" : "income" }
+                    })
+                    .ToList();
                 
                 // Отправляем запрос в API
-                var response = await _apiService.SendChatMessageAsync(message, context);
+                var response = await _apiService.SendChatMessageAsync(message, context, txData);
                 
                 // Убираем индикатор и показываем ответ
                 RemoveTypingIndicator();
@@ -290,12 +303,21 @@ namespace FinanceAssistant.Pages
             {
                 var balance = await _databaseService.GetTotalBalanceAsync();
                 var (income, expense) = await _databaseService.GetMonthlyTotalsAsync();
-                var transactions = await _databaseService.GetRecentTransactionsAsync(5);
+                var transactions = await _databaseService.GetTransactionsAsync();
                 
-                var recentTransStr = string.Join(", ", transactions.Select(t => 
+                var expenses = transactions.Where(t => t.Type == Models.TransactionType.Expense).ToList();
+                var byCategory = expenses.GroupBy(t => t.Category?.Name ?? "Other")
+                    .Select(g => new { Category = g.Key, Total = g.Sum(t => t.Amount) })
+                    .OrderByDescending(x => x.Total)
+                    .Take(5)
+                    .ToList();
+                
+                var categoryInfo = string.Join(", ", byCategory.Select(c => $"{c.Category}: {c.Total:N0} RUB"));
+                
+                var recentTransStr = string.Join(", ", transactions.OrderByDescending(t => t.Date).Take(5).Select(t => 
                     $"{t.Title}: {(t.Type == Models.TransactionType.Income ? "+" : "-")}{t.Amount} RUB"));
 
-                return $"Баланс: {balance} RUB. Доход за месяц: {income} RUB. Расходы за месяц: {expense} RUB. Последние операции: {recentTransStr}";
+                return $"Баланс: {balance:N0} RUB. Доход за месяц: {income:N0} RUB. Расходы за месяц: {expense:N0} RUB.\nТоп категорий расходов: {categoryInfo}.\nПоследние операции: {recentTransStr}";
             }
             catch
             {

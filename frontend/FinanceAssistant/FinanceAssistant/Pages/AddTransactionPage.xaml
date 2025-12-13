@@ -9,7 +9,7 @@
     <Grid RowDefinitions="Auto,*,Auto">
         
         <!-- Header -->
-        <Grid Grid.Row="0" Padding="20,50,20,20" ColumnDefinitions="Auto,*,Auto">
+        <Grid Grid.Row="0" Padding="20,20,20,20" ColumnDefinitions="Auto,*,Auto">
             <Border BackgroundColor="{DynamicResource BackgroundElevated}"
                     StrokeShape="RoundRectangle 20"
                     Stroke="Transparent"
@@ -35,8 +35,8 @@
         </Grid>
 
         <!-- Content -->
-        <ScrollView Grid.Row="1">
-            <VerticalStackLayout Spacing="20" Padding="20,10">
+        <ScrollView Grid.Row="1" BackgroundColor="{DynamicResource BackgroundDark}">
+            <VerticalStackLayout Spacing="20" Padding="20,10" BackgroundColor="{DynamicResource BackgroundDark}">
                 
                 <!-- Transaction Type Toggle -->
                 <Border BackgroundColor="{DynamicResource BackgroundCard}"
@@ -235,9 +235,6 @@
                         </Grid>
                     </VerticalStackLayout>
                 </Border>
-
-                <!-- Bottom spacing -->
-                <BoxView HeightRequest="20" Color="Transparent"/>
             </VerticalStackLayout>
         </ScrollView>
 

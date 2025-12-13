@@ -8,6 +8,7 @@ namespace FinanceAssistant.Services
     {
         public string message { get; set; } = string.Empty;
         public string? context { get; set; }
+        public List<Dictionary<string, object>>? transactions { get; set; }
     }
 
     public class ChatResponse
@@ -61,14 +62,19 @@ namespace FinanceAssistant.Services
 
         public string GetCurrentServerUrl() => _baseUrl;
 
-        public async Task<string> SendChatMessageAsync(string message, string? context = null)
+        public async Task<string> SendChatMessageAsync(
+            string message,
+            string? context = null,
+            List<Dictionary<string, object>>? transactions = null
+        )
         {
             try
             {
                 var request = new ChatRequest
                 {
                     message = message,
-                    context = context
+                    context = context,
+                    transactions = transactions
                 };
 
                 var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/chat", request);
@@ -139,11 +145,12 @@ namespace FinanceAssistant.Services
                 urlsToTry.Add($"http://172.20.10.{i}:8000");
             }
 
-            // Стандартные сети
-            for (int i = 1; i <= 10; i++)
+            // Стандартные сети (расширенный диапазон)
+            for (int i = 1; i <= 50; i++)
             {
                 urlsToTry.Add($"http://192.168.1.{i}:8000");
                 urlsToTry.Add($"http://192.168.0.{i}:8000");
+                urlsToTry.Add($"http://192.168.2.{i}:8000");
             }
 
             foreach (var url in urlsToTry)

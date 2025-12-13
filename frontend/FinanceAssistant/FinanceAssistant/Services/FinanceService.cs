@@ -82,11 +82,12 @@ namespace FinanceAssistant.Services
                 urlsToTry.Add($"http://172.20.10.{i}:8000");
             }
 
-            // Стандартные сети
-            for (int i = 1; i <= 10; i++)
+            // Стандартные сети (расширенный диапазон)
+            for (int i = 1; i <= 50; i++)
             {
                 urlsToTry.Add($"http://192.168.1.{i}:8000");
                 urlsToTry.Add($"http://192.168.0.{i}:8000");
+                urlsToTry.Add($"http://192.168.2.{i}:8000");
             }
 
             foreach (var url in urlsToTry)
@@ -157,7 +158,11 @@ namespace FinanceAssistant.Services
             };
         }
 
-        public async Task<ChatResult> SendChatMessageAsync(string message, string? context = null)
+        public async Task<ChatResult> SendChatMessageAsync(
+            string message,
+            string? context = null,
+            List<Dictionary<string, object>>? transactions = null
+        )
         {
             try
             {
@@ -167,7 +172,8 @@ namespace FinanceAssistant.Services
                 var request = new
                 {
                     message = message,
-                    context = context
+                    context = context,
+                    transactions = transactions
                 };
 
                 var json = JsonSerializer.Serialize(request);

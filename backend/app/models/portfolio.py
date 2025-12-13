@@ -23,3 +23,4 @@ class PortfolioAnalysisResponse(BaseModel):
     questions: Optional[List[str]] = None
     next_steps: Optional[str] = None
 
+

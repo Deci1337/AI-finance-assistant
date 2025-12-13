@@ -59,3 +59,4 @@ class ForecastResponse(BaseModel):
     description: Optional[str] = None
     timestamp: Optional[str] = None
 
+

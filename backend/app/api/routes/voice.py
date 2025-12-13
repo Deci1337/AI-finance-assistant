@@ -88,3 +88,4 @@ async def transcribe_and_extract(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing voice message: {str(e)}")
 
+

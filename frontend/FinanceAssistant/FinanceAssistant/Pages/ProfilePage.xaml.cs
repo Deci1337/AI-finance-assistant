@@ -21,6 +21,25 @@ namespace FinanceAssistant.Pages
         {
             base.OnAppearing();
             await LoadProfileAsync();
+            
+            if (Application.Current != null)
+            {
+                Application.Current.RequestedThemeChanged += OnThemeChanged;
+            }
+        }
+
+        protected override void OnDisappearing()
+        {
+            base.OnDisappearing();
+            if (Application.Current != null)
+            {
+                Application.Current.RequestedThemeChanged -= OnThemeChanged;
+            }
+        }
+
+        private async void OnThemeChanged(object? sender, AppThemeChangedEventArgs e)
+        {
+            await LoadAchievementsAsync();
         }
 
         private async Task LoadProfileAsync()
@@ -71,12 +90,13 @@ namespace FinanceAssistant.Pages
         private View CreateAchievementView(Achievement achievement)
         {
             var isEarned = achievement.IsEarned;
+            var isDarkTheme = Application.Current?.RequestedTheme == AppTheme.Dark;
             
             var container = new Border
             {
                 BackgroundColor = isEarned 
-                    ? Color.FromArgb("#2D4A3E")  // Darker green for earned
-                    : Color.FromArgb("#2A2F3A"), // Gray for locked
+                    ? (isDarkTheme ? Color.FromArgb("#2D4A3E") : Color.FromArgb("#E0F7F0"))  // Darker green for earned (dark) / Light green (light)
+                    : (isDarkTheme ? Color.FromArgb("#2A2F3A") : Color.FromArgb("#E9ECEF")), // Gray for locked (dark) / Light gray (light)
                 StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 15 },
                 Stroke = isEarned 
                     ? Color.FromArgb("#00D09E")

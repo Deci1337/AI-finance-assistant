@@ -34,3 +34,4 @@ async def analyze_portfolio(request: PortfolioAnalysisRequest) -> PortfolioAnaly
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error analyzing portfolio: {str(e)}")
 
+

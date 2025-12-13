@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.models.chat import ChatRequest, ChatResponse, FriendlinessRequest, FriendlinessResponse
 from app.services.ai_service import AIService
+from app.services.spending_analytics_service import SpendingAnalyticsService
 
 router = APIRouter()
 
@@ -17,6 +18,14 @@ async def chat_with_ai(request: ChatRequest) -> ChatResponse:
     Context can include user's financial information.
     """
     try:
+        # Deterministic analytics for spending-related questions (uses provided user transactions)
+        analytics_answer = SpendingAnalyticsService.try_answer(request.message, request.transactions)
+        if analytics_answer:
+            return ChatResponse(
+                response=analytics_answer,
+                timestamp=datetime.now().isoformat()
+            )
+
         response_text = AIService.chat(request.message, request.context)
         
         return ChatResponse(
@@ -52,4 +61,5 @@ async def analyze_friendliness(request: FriendlinessRequest) -> FriendlinessResp
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error analyzing friendliness: {str(e)}")
+
 

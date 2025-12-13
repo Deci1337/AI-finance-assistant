@@ -8,7 +8,7 @@
     <Grid RowDefinitions="Auto,*,Auto">
         
         <!-- Header -->
-        <Grid Grid.Row="0" Padding="20,50,20,20" ColumnDefinitions="Auto,*">
+        <Grid Grid.Row="0" Padding="20,20,20,20" ColumnDefinitions="Auto,*">
             <Border BackgroundColor="{StaticResource BackgroundElevated}"
                     StrokeShape="RoundRectangle 20"
                     Stroke="Transparent"
@@ -39,8 +39,8 @@
         </Grid>
 
         <!-- Chat Messages -->
-        <ScrollView Grid.Row="1" x:Name="ChatScrollView">
-            <VerticalStackLayout x:Name="MessagesContainer" Spacing="15" Padding="20,10">
+        <ScrollView Grid.Row="1" x:Name="ChatScrollView" BackgroundColor="{DynamicResource BackgroundDark}">
+            <VerticalStackLayout x:Name="MessagesContainer" Spacing="15" Padding="20,10" BackgroundColor="{DynamicResource BackgroundDark}">
                 
                 <!-- AI Welcome Message -->
                 <Border BackgroundColor="{StaticResource BackgroundCard}"

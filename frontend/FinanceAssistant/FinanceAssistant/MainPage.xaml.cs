@@ -46,10 +46,15 @@ namespace FinanceAssistant
         
         private async Task ShowAchievementNotificationAsync(Achievement achievement)
         {
+            var isDarkTheme = Application.Current?.RequestedTheme == AppTheme.Dark;
+            var backgroundColor = isDarkTheme ? Color.FromArgb("#1F2937") : Color.FromArgb("#FFFFFF");
+            var textColor = isDarkTheme ? Colors.White : Color.FromArgb("#1A1A2E");
+            var secondaryTextColor = isDarkTheme ? Color.FromArgb("#9CA3AF") : Color.FromArgb("#6C757D");
+            
             // Create notification popup
             var notification = new Border
             {
-                BackgroundColor = Color.FromArgb("#1F2937"),
+                BackgroundColor = backgroundColor,
                 StrokeShape = new RoundRectangle { CornerRadius = 20 },
                 Stroke = Color.FromArgb("#00D09E"),
                 StrokeThickness = 2,
@@ -65,9 +70,9 @@ namespace FinanceAssistant
             notification.Shadow = new Shadow
             {
                 Brush = Color.FromArgb("#00D09E"),
-                Offset = new Point(0, 0),
+                Offset = new Point(0, 4),
                 Radius = 20,
-                Opacity = 0.6f
+                Opacity = 0.4f
             };
 
             var content = new HorizontalStackLayout
@@ -101,7 +106,7 @@ namespace FinanceAssistant
             {
                 Text = achievement.Name,
                 FontSize = 18,
-                TextColor = Colors.White,
+                TextColor = textColor,
                 FontAttributes = FontAttributes.Bold
             });
 
@@ -109,7 +114,7 @@ namespace FinanceAssistant
             {
                 Text = achievement.Description,
                 FontSize = 12,
-                TextColor = Color.FromArgb("#9CA3AF")
+                TextColor = secondaryTextColor
             });
             
             content.Children.Add(emoji);

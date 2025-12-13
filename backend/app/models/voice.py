@@ -11,3 +11,4 @@ class VoiceTranscriptionResponse(BaseModel):
     confidence: Optional[float] = None
     error: Optional[str] = None
 
+

@@ -24,3 +24,4 @@ class ComprehensiveAnalysisResponse(BaseModel):
     warnings_and_considerations: Optional[List[str]] = None
     extracted_parameters: Optional[Dict] = None
 
+

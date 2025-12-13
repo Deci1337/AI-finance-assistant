@@ -24,16 +24,15 @@ namespace FinanceAssistant.Pages
         private void UpdateThemeUI()
         {
             bool isDark = _themeService.IsDarkTheme;
-            ThemeSwitch.IsToggled = isDark;
             ThemeStatusLabel.Text = isDark ? "Темная тема" : "Светлая тема";
-            ThemeIcon.Text = isDark ? "M" : "S";
+            ThemeEmojiButton.Text = isDark ? "🌙" : "☀️";
         }
 
-        private void OnThemeToggled(object? sender, ToggledEventArgs e)
+        private void OnThemeTapped(object? sender, EventArgs e)
         {
-            _themeService.IsDarkTheme = e.Value;
-            ThemeStatusLabel.Text = e.Value ? "Темная тема" : "Светлая тема";
-            ThemeIcon.Text = e.Value ? "M" : "S";
+            bool newTheme = !_themeService.IsDarkTheme;
+            _themeService.IsDarkTheme = newTheme;
+            UpdateThemeUI();
         }
 
         private async void OnGenerateTestDataTapped(object? sender, EventArgs e)
@@ -82,4 +81,5 @@ namespace FinanceAssistant.Pages
         }
     }
 }
+
 

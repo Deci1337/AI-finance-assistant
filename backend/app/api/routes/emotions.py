@@ -53,3 +53,4 @@ async def analyze_emotions(request: EmotionsAnalysisRequest) -> EmotionsAnalysis
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error analyzing emotions: {str(e)}")
 
+
